@@ -29,18 +29,6 @@
       <button class="btn btn-block" type="submit">Entrar</button>
     </form>
 
-    <details style="margin-top:14px">
-      <summary style="cursor:pointer;font-size:.85rem;color:var(--text-muted)">¿Ya usas Libro en otro dispositivo?</summary>
-      <div style="margin-top:10px">
-        <label for="boot-url">URL del Web App (Apps Script)</label>
-        <input id="boot-url" placeholder="https://script.google.com/macros/s/.../exec">
-        <label for="boot-secret">Clave secreta</label>
-        <input id="boot-secret" placeholder="La misma que configuraste antes">
-        <button class="btn btn-secondary btn-block" type="button" id="boot-save">Guardar</button>
-        <div class="error-msg" id="boot-status"></div>
-      </div>
-    </details>
-
     <form id="register-form" style="display:none">
       <label for="r-user">Elige un usuario</label>
       <input id="r-user" required autocomplete="username">
@@ -58,19 +46,10 @@
 <script src="js/db.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/theme.js"></script>
+<script src="js/config.js"></script>
 <script src="js/sheets.js"></script>
 <script src="js/sync.js"></script>
 <script>
-document.getElementById("boot-url").value = Sheets.getConfig().webAppUrl || "";
-document.getElementById("boot-secret").value = Sheets.getConfig().secret || "";
-document.getElementById("boot-save").addEventListener("click", () => {
-  Sheets.saveConfig({
-    webAppUrl: document.getElementById("boot-url").value.trim(),
-    secret: document.getElementById("boot-secret").value.trim(),
-  });
-  document.getElementById("boot-status").textContent = "Guardado. Ahora inicia sesión con tu usuario y contraseña.";
-});
-
 document.querySelectorAll(".tab-btn").forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));

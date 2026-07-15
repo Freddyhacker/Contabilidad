@@ -29,15 +29,14 @@ const Sync = (() => {
   }
 
   function updateLed() {
-    if (!ledEl) return;
+    if (!ledEl || !ledEl.length) return;
     let color, title;
     if (syncing) { color = "var(--accent-expense)"; title = "Sincronizando..."; }
     else if (!Sheets.isConfigured()) { color = "var(--accent-danger)"; title = "Sincronización no configurada"; }
     else if (!navigator.onLine) { color = "var(--accent-danger)"; title = "Sin conexión — se sincronizará al reconectar"; }
     else if (isPending()) { color = "var(--accent-danger)"; title = "Cambios sin sincronizar"; }
     else { color = "var(--accent-income)"; title = "Sincronizado"; }
-    ledEl.style.background = color;
-    ledEl.title = title;
+    ledEl.forEach(el => { el.style.background = color; el.title = title; });
   }
 
   // Se llama cada vez que se guarda un cambio en la base local

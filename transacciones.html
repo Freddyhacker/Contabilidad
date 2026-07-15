@@ -17,11 +17,11 @@
       <h3>Nuevo movimiento</h3>
       <form id="mov-form" class="form-row">
         <div>
-          <label for="m-tipo">Tipo</label>
-          <select id="m-tipo">
-            <option value="ingreso">Ingreso</option>
-            <option value="gasto">Gasto</option>
-          </select>
+          <label>Tipo</label>
+          <div class="tab-row" id="tipo-tabs" style="margin:0">
+            <div class="tab-btn active" data-tipo="ingreso">Ingreso</div>
+            <div class="tab-btn" data-tipo="gasto">Gasto</div>
+          </div>
         </div>
         <div>
           <label for="m-fecha">Fecha</label>
@@ -66,14 +66,14 @@
 <script src="js/nav.js"></script>
 <script>
 const fmt = n => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+let tipoActual = "ingreso";
 
 function loadCategorias() {
-  const tipo = document.getElementById("m-tipo").value;
-  const cats = DB.all("SELECT * FROM categorias WHERE tipo = ? ORDER BY nombre", [tipo]);
+  const cats = DB.all("SELECT * FROM categorias WHERE tipo = ? ORDER BY nombre", [tipoActual]);
   const sel = document.getElementById("m-cat");
   sel.innerHTML = cats.length
     ? cats.map(c => `<option value="${c.id}">${c.nombre}</option>`).join("")
-    : `<option value="">No hay categorías de ${tipo}</option>`;
+    : `<option value="">No hay categorías de ${tipoActual}</option>`;
 }
 
 function loadMovimientos() {
@@ -109,11 +109,19 @@ function loadMovimientos() {
   document.getElementById("m-fecha").valueAsDate = new Date();
   loadCategorias();
   loadMovimientos();
-  document.getElementById("m-tipo").addEventListener("change", loadCategorias);
+
+  document.querySelectorAll("#tipo-tabs .tab-btn").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("#tipo-tabs .tab-btn").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      tipoActual = tab.dataset.tipo;
+      loadCategorias();
+    });
+  });
 
   document.getElementById("mov-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const tipo = document.getElementById("m-tipo").value;
+    const tipo = tipoActual;
     const fecha = document.getElementById("m-fecha").value;
     const monto = parseFloat(document.getElementById("m-monto").value);
     const catId = document.getElementById("m-cat").value || null;

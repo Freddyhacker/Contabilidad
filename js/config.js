@@ -8,6 +8,6 @@
    pegaste en Ajustes → Sincronización con Google Sheets.
    ============================================ */
 const SHEETS_DEFAULT_CONFIG = {
-  webAppUrl: "PEGA_AQUI_LA_URL_DE_TU_APPS_SCRIPT",
-  secret: "PEGA_AQUI_TU_CLAVE_SECRETA",
+  webAppUrl: "https://script.google.com/macros/s/AKfycbxdJ5Ag1jZKed03_jkpCKfHQHQnfHjj6F4SIgVsgqM12dtwy4Xnv2TbfI-73kNQKECWpw/exec",
+  secret: "iUM&al^a5rvIQ%iJ1Yg",
 };

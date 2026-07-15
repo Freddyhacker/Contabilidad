@@ -73,6 +73,7 @@
 <script src="js/theme.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/sheets.js"></script>
+<script src="js/sync.js"></script>
 <script>
 function renderThemeControls() {
   const current = { ...Theme.defaults(), ...Theme.load() };
@@ -180,18 +181,9 @@ async function loadUsers(currentUsername) {
   document.getElementById("s-connect").addEventListener("click", async () => {
     const statusEl = document.getElementById("s-status");
     if (!Sheets.isConfigured()) { statusEl.textContent = "Completa y guarda la configuración primero."; return; }
-    try {
-      statusEl.textContent = "Sincronizando...";
-      const movimientos = DB.all("SELECT * FROM movimientos");
-      const categorias = DB.all("SELECT * FROM categorias");
-      const presupuestos = DB.all("SELECT * FROM presupuestos");
-      await Sheets.pushEncryptedRows("movimientos", movimientos, session.dataKey);
-      await Sheets.pushEncryptedRows("categorias", categorias, session.dataKey);
-      await Sheets.pushEncryptedRows("presupuestos", presupuestos, session.dataKey);
-      statusEl.textContent = "Sincronizado. Cada celda quedó cifrada.";
-    } catch (err) {
-      statusEl.textContent = "Error al sincronizar: " + err.message;
-    }
+    statusEl.textContent = "Sincronizando...";
+    await Sync.doSync();
+    statusEl.textContent = "Listo. Revisa el LED junto a \"Libro\" para el estado.";
   });
 })();
 </script>

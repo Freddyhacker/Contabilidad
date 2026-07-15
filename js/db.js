@@ -83,7 +83,10 @@ const DB = (() => {
     return values.map(row => Object.fromEntries(row.map((v, i) => [columns[i], v])));
   }
 
-  async function save() { await persist(); }
+  async function save() {
+    await persist();
+    if (typeof Sync !== "undefined") Sync.markDirty(dataKey);
+  }
 
   return { initEmpty, load, run, all, save };
 })();

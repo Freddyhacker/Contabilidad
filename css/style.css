@@ -25,7 +25,10 @@ a { color: inherit; }
 /* ---------- Layout con sidebar ---------- */
 .app-shell { display: flex; min-height: 100vh; }
 
-.sidebar {
+.mobile-topbar { display: none; }
+.sidebar-backdrop { display: none; }
+
+.sidebar-inner {
   width: 232px;
   flex-shrink: 0;
   background: var(--bg-panel);
@@ -212,9 +215,65 @@ tr:last-child td { border-bottom: none; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .74rem; background: var(--bg-panel-alt); color: var(--text-muted); }
 
 @media (max-width: 800px) {
-  .app-shell { flex-direction: column; }
-  .sidebar { position: static; width: 100%; height: auto; flex-direction: row; overflow-x: auto; overflow-y: visible; }
-  .main { margin-left: 0; }
-  .sidebar-footer { display: none; }
+  .app-shell { display: block; }
+  .main { margin-left: 0; padding: var(--space-3); padding-top: calc(56px + var(--space-3)); max-width: 100%; }
+
+  /* Topbar fija con hamburguesa, reemplaza al sidebar fijo de escritorio */
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    padding: 0 var(--space-3);
+    background: var(--bg-panel);
+    border-bottom: var(--border-width) solid var(--border-color);
+    z-index: 30;
+  }
+  .mobile-topbar .brand { font-size: 1.05rem; }
+
+  .hamburger {
+    width: 34px; height: 34px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    background: transparent; border: none; cursor: pointer; padding: 0;
+  }
+  .hamburger span { width: 20px; height: 2px; background: var(--text-primary); border-radius: 2px; }
+
+  /* El sidebar de escritorio se convierte en un drawer que entra desde la izquierda */
+  .sidebar-inner {
+    position: fixed;
+    top: 0; left: 0;
+    width: 240px;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+    z-index: 50;
+  }
+  .sidebar-inner.open { transform: translateX(0); }
+  .sidebar-inner .brand { display: none; } /* ya está en la topbar móvil */
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 40;
+  }
+  .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  .sidebar-footer { display: block; }
+
   .grid-3, .grid-2 { grid-template-columns: 1fr; }
+
+  h1 { font-size: 1.3rem; }
+  .topbar { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+  .card { padding: var(--space-3); }
+
+  /* Tablas: scroll horizontal en vez de aplastarse */
+  table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+  th, td { padding: 10px 8px; font-size: .85rem; }
 }

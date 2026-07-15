@@ -15,8 +15,13 @@ const Sheets = (() => {
   const CFG_KEY = "contapp_sheets_cfg"; // { webAppUrl, secret }
 
   function getConfig() {
-    try { return JSON.parse(localStorage.getItem(CFG_KEY)) || {}; }
-    catch { return {}; }
+    let stored = null;
+    try { stored = JSON.parse(localStorage.getItem(CFG_KEY)); } catch {}
+    if (stored && stored.webAppUrl && stored.secret) return stored;
+    if (typeof SHEETS_DEFAULT_CONFIG !== "undefined" && SHEETS_DEFAULT_CONFIG.webAppUrl && !SHEETS_DEFAULT_CONFIG.webAppUrl.startsWith("PEGA_AQUI")) {
+      return SHEETS_DEFAULT_CONFIG;
+    }
+    return stored || {};
   }
   function saveConfig(cfg) {
     localStorage.setItem(CFG_KEY, JSON.stringify(cfg));

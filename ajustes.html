@@ -50,14 +50,15 @@
       <h3>Sincronización con Google Sheets</h3>
       <p class="sub" style="margin-bottom:var(--space-3)">
         Cada valor se cifra antes de subirse — el Sheet solo guarda texto ilegible.
-        Necesitas tus propias credenciales de Google Cloud (ver README del proyecto).
+        Se conecta mediante un script pegado dentro del propio Sheet (ver README).
       </p>
       <form id="sheets-form">
-        <label for="s-client">Client ID (OAuth)</label><input id="s-client">
-        <label for="s-key">API Key</label><input id="s-key">
-        <label for="s-sheet">ID de la hoja de cálculo</label><input id="s-sheet">
+        <label for="s-url">URL del Web App (Apps Script)</label>
+        <input id="s-url" placeholder="https://script.google.com/macros/s/.../exec">
+        <label for="s-secret">Clave secreta</label>
+        <input id="s-secret" placeholder="La misma que pusiste en el script">
         <button class="btn" type="submit">Guardar configuración</button>
-        <button class="btn btn-secondary" type="button" id="s-connect">Conectar y sincronizar ahora</button>
+        <button class="btn btn-secondary" type="button" id="s-connect">Sincronizar ahora</button>
       </form>
       <div class="error-msg" id="s-status"></div>
     </div>
@@ -164,16 +165,14 @@ async function loadUsers(currentUsername) {
 
   // Sheets config
   const cfg = Sheets.getConfig();
-  document.getElementById("s-client").value = cfg.clientId || "";
-  document.getElementById("s-key").value = cfg.apiKey || "";
-  document.getElementById("s-sheet").value = cfg.sheetId || "";
+  document.getElementById("s-url").value = cfg.webAppUrl || "";
+  document.getElementById("s-secret").value = cfg.secret || "";
 
   document.getElementById("sheets-form").addEventListener("submit", (e) => {
     e.preventDefault();
     Sheets.saveConfig({
-      clientId: document.getElementById("s-client").value.trim(),
-      apiKey: document.getElementById("s-key").value.trim(),
-      sheetId: document.getElementById("s-sheet").value.trim(),
+      webAppUrl: document.getElementById("s-url").value.trim(),
+      secret: document.getElementById("s-secret").value.trim(),
     });
     document.getElementById("s-status").textContent = "Configuración guardada.";
   });
@@ -182,9 +181,7 @@ async function loadUsers(currentUsername) {
     const statusEl = document.getElementById("s-status");
     if (!Sheets.isConfigured()) { statusEl.textContent = "Completa y guarda la configuración primero."; return; }
     try {
-      statusEl.textContent = "Conectando con Google...";
-      await Sheets.ensureReady();
-      await Sheets.signIn();
+      statusEl.textContent = "Sincronizando...";
       const movimientos = DB.all("SELECT * FROM movimientos");
       const categorias = DB.all("SELECT * FROM categorias");
       const presupuestos = DB.all("SELECT * FROM presupuestos");
@@ -193,7 +190,7 @@ async function loadUsers(currentUsername) {
       await Sheets.pushEncryptedRows("presupuestos", presupuestos, session.dataKey);
       statusEl.textContent = "Sincronizado. Cada celda quedó cifrada.";
     } catch (err) {
-      statusEl.textContent = "Error al sincronizar: " + (err.message || JSON.stringify(err));
+      statusEl.textContent = "Error al sincronizar: " + err.message;
     }
   });
 })();

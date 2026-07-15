@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Libro — Ajustes</title>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar-mount"></nav>
+  <main class="main">
+    <div class="topbar"><div><h1>Ajustes</h1><div class="sub">Personaliza la app y administra usuarios</div></div></div>
+
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <h3>Apariencia — capas configurables</h3>
+      <div id="theme-controls"></div>
+      <div style="display:flex;gap:10px;margin-top:var(--space-3)">
+        <button class="btn" id="theme-save">Guardar apariencia</button>
+        <button class="btn btn-secondary" id="theme-reset">Restablecer por defecto</button>
+      </div>
+    </div>
+
+    <div class="card" id="admin-card" style="display:none;margin-bottom:var(--space-4)">
+      <h3>Usuarios</h3>
+      <table id="user-table"><thead><tr><th>Usuario</th><th>Rol</th><th></th></tr></thead><tbody></tbody></table>
+
+      <h3 style="margin-top:var(--space-4)">Agregar usuario</h3>
+      <form id="add-user-form" class="grid grid-2">
+        <div><label for="nu-name">Usuario</label><input id="nu-name" required></div>
+        <div><label for="nu-pass">Contraseña</label><input id="nu-pass" type="password" required></div>
+        <div><label for="nu-role">Rol</label>
+          <select id="nu-role"><option value="usuario">Usuario</option><option value="admin">Administrador</option></select>
+        </div>
+        <div style="align-self:end"><button class="btn btn-block" type="submit">Agregar</button></div>
+      </form>
+      <div class="error-msg" id="nu-error"></div>
+
+      <h3 style="margin-top:var(--space-4)">Restablecer contraseña de un usuario</h3>
+      <form id="reset-form" class="grid grid-2">
+        <div><label for="rp-user">Usuario</label><select id="rp-user"></select></div>
+        <div><label for="rp-pass">Nueva contraseña</label><input id="rp-pass" type="password" required></div>
+        <div style="grid-column:1/-1"><button class="btn btn-secondary btn-block" type="submit">Restablecer contraseña</button></div>
+      </form>
+      <div class="error-msg" id="rp-error"></div>
+    </div>
+
+    <div class="card">
+      <h3>Sincronización con Google Sheets</h3>
+      <p class="sub" style="margin-bottom:var(--space-3)">
+        Cada valor se cifra antes de subirse — el Sheet solo guarda texto ilegible.
+        Necesitas tus propias credenciales de Google Cloud (ver README del proyecto).
+      </p>
+      <form id="sheets-form">
+        <label for="s-client">Client ID (OAuth)</label><input id="s-client">
+        <label for="s-key">API Key</label><input id="s-key">
+        <label for="s-sheet">ID de la hoja de cálculo</label><input id="s-sheet">
+        <button class="btn" type="submit">Guardar configuración</button>
+        <button class="btn btn-secondary" type="button" id="s-connect">Conectar y sincronizar ahora</button>
+      </form>
+      <div class="error-msg" id="s-status"></div>
+    </div>
+  </main>
+</div>
+
+<script src="js/idb.js"></script>
+<script src="js/crypto.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/sheets.js"></script>
+<script>
+function renderThemeControls() {
+  const current = { ...Theme.defaults(), ...Theme.load() };
+  const wrap = document.getElementById("theme-controls");
+  wrap.innerHTML = Theme.LAYERS.map(group => `
+    <div style="margin-bottom:14px">
+      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:12px 0 4px">${group.group}</div>
+      ${group.items.map(item => `
+        <div class="config-row">
+          <div class="label-block">${item.label}</div>
+          ${item.type === "color"
+            ? `<input type="color" data-var="${item.varName}" value="${toHex(current[item.varName])}">`
+            : `<input type="range" min="${item.min}" max="${item.max}" data-var="${item.varName}" value="${parseInt(current[item.varName]) || 0}">`
+          }
+        </div>`).join("")}
+    </div>`).join("");
+
+  wrap.querySelectorAll("input").forEach(input => {
+    input.addEventListener("input", () => {
+      const v = input.type === "range" ? input.value + "px" : input.value;
+      document.documentElement.style.setProperty(input.dataset.var, v);
+    });
+  });
+}
+
+function toHex(v) {
+  if (!v) return "#000000";
+  if (v.startsWith("#")) return v;
+  const el = document.createElement("div");
+  el.style.color = v; document.body.appendChild(el);
+  const rgb = getComputedStyle(el).color.match(/\d+/g);
+  document.body.removeChild(el);
+  if (!rgb) return "#000000";
+  return "#" + rgb.slice(0, 3).map(n => (+n).toString(16).padStart(2, "0")).join("");
+}
+
+async function loadUsers(currentUsername) {
+  const users = await Auth.getUsers();
+  document.querySelector("#user-table tbody").innerHTML = users.map(u => `
+    <tr><td>${u.username}${u.username === currentUsername ? ' (tú)' : ''}</td>
+    <td><span class="badge">${u.role}</span></td><td></td></tr>`).join("");
+  const sel = document.getElementById("rp-user");
+  sel.innerHTML = users.map(u => `<option value="${u.username}">${u.username}</option>`).join("");
+}
+
+(async () => {
+  const session = await guardPage();
+  if (!session) return;
+
+  renderThemeControls();
+  document.getElementById("theme-save").addEventListener("click", () => {
+    const values = {};
+    document.querySelectorAll("#theme-controls input").forEach(i => {
+      values[i.dataset.var] = i.type === "range" ? i.value + "px" : i.value;
+    });
+    Theme.save(values);
+  });
+  document.getElementById("theme-reset").addEventListener("click", () => Theme.reset());
+
+  if (session.role === "admin") {
+    document.getElementById("admin-card").style.display = "block";
+    await loadUsers(session.username);
+
+    document.getElementById("add-user-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById("nu-error");
+      try {
+        await Auth.addUser(
+          document.getElementById("nu-name").value.trim(),
+          document.getElementById("nu-pass").value,
+          document.getElementById("nu-role").value,
+          session.dataKey
+        );
+        e.target.reset();
+        errEl.textContent = "";
+        await loadUsers(session.username);
+      } catch (err) { errEl.textContent = err.message; }
+    });
+
+    document.getElementById("reset-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById("rp-error");
+      try {
+        await Auth.adminResetPassword(session.dataKey, document.getElementById("rp-user").value, document.getElementById("rp-pass").value);
+        errEl.textContent = "Contraseña actualizada.";
+        e.target.reset();
+      } catch (err) { errEl.textContent = err.message; }
+    });
+  }
+
+  // Sheets config
+  const cfg = Sheets.getConfig();
+  document.getElementById("s-client").value = cfg.clientId || "";
+  document.getElementById("s-key").value = cfg.apiKey || "";
+  document.getElementById("s-sheet").value = cfg.sheetId || "";
+
+  document.getElementById("sheets-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    Sheets.saveConfig({
+      clientId: document.getElementById("s-client").value.trim(),
+      apiKey: document.getElementById("s-key").value.trim(),
+      sheetId: document.getElementById("s-sheet").value.trim(),
+    });
+    document.getElementById("s-status").textContent = "Configuración guardada.";
+  });
+
+  document.getElementById("s-connect").addEventListener("click", async () => {
+    const statusEl = document.getElementById("s-status");
+    if (!Sheets.isConfigured()) { statusEl.textContent = "Completa y guarda la configuración primero."; return; }
+    try {
+      statusEl.textContent = "Conectando con Google...";
+      await Sheets.ensureReady();
+      await Sheets.signIn();
+      const movimientos = DB.all("SELECT * FROM movimientos");
+      const categorias = DB.all("SELECT * FROM categorias");
+      const presupuestos = DB.all("SELECT * FROM presupuestos");
+      await Sheets.pushEncryptedRows("movimientos", movimientos, session.dataKey);
+      await Sheets.pushEncryptedRows("categorias", categorias, session.dataKey);
+      await Sheets.pushEncryptedRows("presupuestos", presupuestos, session.dataKey);
+      statusEl.textContent = "Sincronizado. Cada celda quedó cifrada.";
+    } catch (err) {
+      statusEl.textContent = "Error al sincronizar: " + (err.message || JSON.stringify(err));
+    }
+  });
+})();
+</script>
+</body>
+</html>

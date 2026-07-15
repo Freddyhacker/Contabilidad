@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Libro — Reportes</title>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar-mount"></nav>
+  <main class="main">
+    <div class="topbar"><div><h1>Reportes</h1><div class="sub">Gastos por categoría — mes actual</div></div></div>
+
+    <div class="card" style="margin-bottom:var(--space-4)">
+      <h3>Gasto por categoría</h3>
+      <div id="bar-chart"></div>
+      <div class="empty-state" id="empty" style="display:none">Sin datos suficientes este mes.</div>
+    </div>
+
+    <div class="card">
+      <h3>Últimos 6 meses</h3>
+      <table id="hist-table">
+        <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/idb.js"></script>
+<script src="js/crypto.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/nav.js"></script>
+<script>
+const fmt = n => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+
+(async () => {
+  const session = await guardPage();
+  if (!session) return;
+
+  const ym = new Date().toISOString().slice(0, 7);
+  const porCat = DB.all(`
+    SELECT c.nombre, c.color, SUM(m.monto) as total
+    FROM movimientos m JOIN categorias c ON c.id = m.categoria_id
+    WHERE m.tipo='gasto' AND substr(m.fecha,1,7)=?
+    GROUP BY c.id ORDER BY total DESC`, [ym]);
+
+  document.getElementById("empty").style.display = porCat.length ? "none" : "block";
+  const max = Math.max(...porCat.map(r => r.total), 1);
+  document.getElementById("bar-chart").innerHTML = porCat.map(r => `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px">
+        <span>${r.nombre}</span><span class="num expense">${fmt(r.total)}</span>
+      </div>
+      <div style="height:10px;border-radius:4px;background:var(--bg-panel-alt)">
+        <div style="height:100%;border-radius:4px;width:${(r.total / max) * 100}%;background:${r.color}"></div>
+      </div>
+    </div>`).join("");
+
+  // Últimos 6 meses
+  const months = [...Array(6)].map((_, i) => {
+    const d = new Date(); d.setMonth(d.getMonth() - i);
+    return d.toISOString().slice(0, 7);
+  }).reverse();
+
+  const rowsHtml = months.map(m => {
+    const rows = DB.all("SELECT tipo, SUM(monto) as t FROM movimientos WHERE substr(fecha,1,7)=? GROUP BY tipo", [m]);
+    const inc = rows.find(r => r.tipo === "ingreso")?.t || 0;
+    const exp = rows.find(r => r.tipo === "gasto")?.t || 0;
+    const label = new Date(m + "-02").toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    return `<tr>
+      <td style="text-transform:capitalize">${label}</td>
+      <td class="num income">${fmt(inc)}</td>
+      <td class="num expense">${fmt(exp)}</td>
+      <td class="num ${inc - exp >= 0 ? 'income' : 'expense'}">${fmt(inc - exp)}</td>
+    </tr>`;
+  }).join("");
+  document.querySelector("#hist-table tbody").innerHTML = rowsHtml;
+})();
+</script>
+</body>
+</html>

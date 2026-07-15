@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Libro — Presupuestos</title>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar-mount"></nav>
+  <main class="main">
+    <div class="topbar"><div><h1>Presupuestos</h1><div class="sub">Define un límite mensual por categoría de gasto</div></div></div>
+
+    <div class="grid grid-2" style="align-items:start">
+      <div class="card">
+        <h3>Nuevo presupuesto</h3>
+        <form id="pres-form">
+          <label for="p-cat">Categoría de gasto</label>
+          <select id="p-cat"></select>
+          <label for="p-limite">Límite mensual</label>
+          <input id="p-limite" type="number" step="0.01" min="0" required>
+          <button class="btn btn-block" type="submit">Guardar presupuesto</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3>Progreso del mes</h3>
+        <div id="pres-list"></div>
+        <div class="empty-state" id="empty" style="display:none">Aún no hay presupuestos.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/idb.js"></script>
+<script src="js/crypto.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/nav.js"></script>
+<script>
+const fmt = n => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+
+function loadCatSelect() {
+  const cats = DB.all("SELECT * FROM categorias WHERE tipo = 'gasto' ORDER BY nombre");
+  const sel = document.getElementById("p-cat");
+  sel.innerHTML = cats.length
+    ? cats.map(c => `<option value="${c.id}">${c.nombre}</option>`).join("")
+    : `<option value="">Crea una categoría de gasto primero</option>`;
+}
+
+function loadPresupuestos() {
+  const ym = new Date().toISOString().slice(0, 7);
+  const rows = DB.all(`
+    SELECT p.*, c.nombre as cat_nombre, c.color as cat_color,
+      (SELECT COALESCE(SUM(m.monto),0) FROM movimientos m
+        WHERE m.categoria_id = p.categoria_id AND m.tipo='gasto' AND substr(m.fecha,1,7)=?) as gastado
+    FROM presupuestos p LEFT JOIN categorias c ON c.id = p.categoria_id`, [ym]);
+
+  document.getElementById("empty").style.display = rows.length ? "none" : "block";
+  document.getElementById("pres-list").innerHTML = rows.map(r => {
+    const pct = Math.min(100, Math.round((r.gastado / r.limite) * 100 || 0));
+    const over = r.gastado > r.limite;
+    return `
+    <div style="margin-bottom:var(--space-3)">
+      <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px">
+        <span>${r.cat_nombre}</span>
+        <span class="num ${over ? 'expense' : ''}">${fmt(r.gastado)} / ${fmt(r.limite)}</span>
+      </div>
+      <div style="height:8px;border-radius:4px;background:var(--bg-panel-alt);overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${over ? 'var(--accent-danger)' : 'var(--accent-income)'}"></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+(async () => {
+  const session = await guardPage();
+  if (!session) return;
+  loadCatSelect();
+  loadPresupuestos();
+
+  document.getElementById("pres-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const catId = document.getElementById("p-cat").value;
+    const limite = parseFloat(document.getElementById("p-limite").value);
+    if (!catId) return;
+    DB.run("INSERT INTO presupuestos (categoria_id, limite) VALUES (?,?)", [catId, limite]);
+    await DB.save();
+    e.target.reset();
+    loadPresupuestos();
+  });
+})();
+</script>
+</body>
+</html>

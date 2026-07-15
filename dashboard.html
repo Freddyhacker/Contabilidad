@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Libro — Dashboard</title>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <nav class="sidebar" id="sidebar-mount"></nav>
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Dashboard</h1><div class="sub" id="today-label"></div></div>
+      <a href="transacciones.html" class="btn">+ Nuevo movimiento</a>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:var(--space-4)">
+      <div class="card"><h3>Ingresos del mes</h3><div class="figure num income" id="m-income">—</div></div>
+      <div class="card"><h3>Gastos del mes</h3><div class="figure num expense" id="m-expense">—</div></div>
+      <div class="card"><h3>Balance del mes</h3><div class="figure num" id="m-balance">—</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Movimientos recientes</h3>
+      <table id="recent-table">
+        <thead><tr><th>Fecha</th><th>Categoría</th><th>Nota</th><th style="text-align:right">Monto</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty-state" id="empty" style="display:none">Aún no hay movimientos. <a href="transacciones.html">Agrega el primero</a>.</div>
+    </div>
+  </main>
+</div>
+
+<script src="js/idb.js"></script>
+<script src="js/crypto.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/nav.js"></script>
+<script>
+(async () => {
+  const session = await guardPage();
+  if (!session) return;
+
+  document.getElementById("today-label").textContent =
+    new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+
+  const ym = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  const rows = DB.all(
+    `SELECT m.*, c.nombre as cat_nombre FROM movimientos m
+     LEFT JOIN categorias c ON c.id = m.categoria_id
+     WHERE substr(m.fecha,1,7) = ?
+     ORDER BY m.fecha DESC`, [ym]
+  );
+
+  const income = rows.filter(r => r.tipo === "ingreso").reduce((s, r) => s + r.monto, 0);
+  const expense = rows.filter(r => r.tipo === "gasto").reduce((s, r) => s + r.monto, 0);
+  const fmt = n => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+
+  document.getElementById("m-income").textContent = fmt(income);
+  document.getElementById("m-expense").textContent = fmt(expense);
+  const balEl = document.getElementById("m-balance");
+  balEl.textContent = fmt(income - expense);
+  balEl.classList.add(income - expense >= 0 ? "income" : "expense");
+
+  const tbody = document.querySelector("#recent-table tbody");
+  const recent = rows.slice(0, 8);
+  if (!recent.length) document.getElementById("empty").style.display = "block";
+  tbody.innerHTML = recent.map(r => `
+    <tr>
+      <td>${r.fecha}</td>
+      <td>${r.cat_nombre || "—"}</td>
+      <td>${r.nota || ""}</td>
+      <td class="num ${r.tipo === 'ingreso' ? 'income' : 'expense'}" style="text-align:right">
+        ${r.tipo === 'ingreso' ? '+' : '-'}${fmt(r.monto)}
+      </td>
+    </tr>`).join("");
+})();
+</script>
+</body>
+</html>

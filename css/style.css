@@ -122,6 +122,20 @@ a { color: inherit; }
 .btn-danger { background: var(--accent-danger); color: #fff; }
 .btn-block { width: 100%; justify-content: center; }
 
+/* ---------- Formulario compacto en fila ---------- */
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+}
+.form-row > div { min-width: 130px; }
+.form-row label { margin-bottom: 6px; }
+.form-row input, .form-row select { margin-bottom: 0; width: 100%; }
+@media (max-width: 700px) {
+  .form-row > div { flex: 1 1 100%; }
+}
+
 /* ---------- Formularios ---------- */
 label { display: block; font-size: .82rem; color: var(--text-muted); margin-bottom: 6px; }
 input, select {

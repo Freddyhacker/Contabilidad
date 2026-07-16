@@ -67,6 +67,9 @@ async function guardPage() {
   const session = await Auth.restoreSession();
   if (!session) { location.href = "index.html"; return null; }
   renderSidebar(location.pathname.split("/").pop(), session);
-  if (typeof Sync !== "undefined") Sync.setLed(document.querySelectorAll(".sync-led"), session.dataKey);
+  if (typeof Sync !== "undefined") {
+    Sync.setLed(document.querySelectorAll(".sync-led"), session.dataKey);
+    Sync.startPolling();
+  }
   return session;
 }

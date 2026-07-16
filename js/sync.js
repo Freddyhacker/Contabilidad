@@ -13,7 +13,6 @@ const Sync = (() => {
   const PENDING_KEY = "contapp_sync_pending";
   let ledEl = null;
   let dataKey = null;
-  let debounceTimer = null;
   let syncing = false;
 
   function setLed(el, key) {
@@ -21,7 +20,7 @@ const Sync = (() => {
     dataKey = key || dataKey;
     updateLed();
     // si hay cambios pendientes de antes y hay conexión, reintenta
-    if (isPending() && navigator.onLine && Sheets.isConfigured()) scheduleSync(200);
+    if (isPending() && navigator.onLine && Sheets.isConfigured()) doSync();
   }
 
   function isPending() {
@@ -39,17 +38,16 @@ const Sync = (() => {
     ledEl.forEach(el => { el.style.background = color; el.title = title; });
   }
 
-  // Se llama cada vez que se guarda un cambio en la base local
+  // Se llama cada vez que se guarda un cambio en la base local. Arranca el
+  // envío YA MISMO (sin esperar un debounce): la petición usa keepalive,
+  // así que sobrevive aunque cambies de página justo después — pero eso
+  // solo protege una petición YA EN CURSO, no una programada para más
+  // tarde con setTimeout.
   function markDirty(key) {
     if (key) dataKey = key;
     localStorage.setItem(PENDING_KEY, "1");
     updateLed();
-    if (Sheets.isConfigured() && navigator.onLine) scheduleSync(350);
-  }
-
-  function scheduleSync(delay) {
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(doSync, delay);
+    if (Sheets.isConfigured() && navigator.onLine) doSync();
   }
 
   async function doSync() {
@@ -77,7 +75,7 @@ const Sync = (() => {
 
   window.addEventListener("online", () => {
     updateLed();
-    if (isPending()) scheduleSync(300);
+    if (isPending()) doSync();
   });
   window.addEventListener("offline", updateLed);
 

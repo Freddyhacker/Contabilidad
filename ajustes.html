@@ -45,25 +45,6 @@
       </form>
       <div class="error-msg" id="rp-error"></div>
     </div>
-
-    <div class="card">
-      <h3>Sincronización con Google Sheets</h3>
-      <p class="sub" style="margin-bottom:var(--space-3)">
-        Cada valor se cifra antes de subirse — el Sheet solo guarda texto ilegible.
-        Se conecta mediante un script pegado dentro del propio Sheet (ver README).
-        Ya viene configurado por defecto para todos los dispositivos (js/config.js);
-        solo cámbialo aquí si necesitas usar un Sheet distinto en este dispositivo.
-      </p>
-      <form id="sheets-form">
-        <label for="s-url">URL del Web App (Apps Script)</label>
-        <input id="s-url" placeholder="https://script.google.com/macros/s/.../exec">
-        <label for="s-secret">Clave secreta</label>
-        <input id="s-secret" placeholder="La misma que pusiste en el script">
-        <button class="btn" type="submit">Guardar configuración</button>
-        <button class="btn btn-secondary" type="button" id="s-connect">Sincronizar ahora</button>
-      </form>
-      <div class="error-msg" id="s-status"></div>
-    </div>
   </main>
 </div>
 
@@ -73,10 +54,10 @@
 <script src="js/db.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/theme.js"></script>
-<script src="js/nav.js"></script>
 <script src="js/config.js"></script>
 <script src="js/sheets.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/nav.js"></script>
 <script>
 function renderThemeControls() {
   const current = { ...Theme.defaults(), ...Theme.load() };
@@ -166,28 +147,6 @@ async function loadUsers(currentUsername) {
       } catch (err) { errEl.textContent = err.message; }
     });
   }
-
-  // Sheets config
-  const cfg = Sheets.getConfig();
-  document.getElementById("s-url").value = cfg.webAppUrl || "";
-  document.getElementById("s-secret").value = cfg.secret || "";
-
-  document.getElementById("sheets-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    Sheets.saveConfig({
-      webAppUrl: document.getElementById("s-url").value.trim(),
-      secret: document.getElementById("s-secret").value.trim(),
-    });
-    document.getElementById("s-status").textContent = "Configuración guardada.";
-  });
-
-  document.getElementById("s-connect").addEventListener("click", async () => {
-    const statusEl = document.getElementById("s-status");
-    if (!Sheets.isConfigured()) { statusEl.textContent = "Completa y guarda la configuración primero."; return; }
-    statusEl.textContent = "Sincronizando...";
-    await Sync.doSync();
-    statusEl.textContent = "Listo. Revisa el LED junto a \"Libro\" para el estado.";
-  });
 })();
 </script>
 </body>

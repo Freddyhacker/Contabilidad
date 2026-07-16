@@ -14,17 +14,18 @@
     <div class="topbar"><div><h1>Reportes</h1><div class="sub">Gastos por categoría — mes actual</div></div></div>
 
     <div class="card" style="margin-bottom:var(--space-4)">
-      <h3>Gasto por categoría</h3>
+      <h3>Gasto por categoría (mes actual)</h3>
+      <div class="figure expense" id="total-gasto" style="margin-bottom:var(--space-3)">$0.00</div>
       <div id="bar-chart"></div>
       <div class="empty-state" id="empty" style="display:none">Sin datos suficientes este mes.</div>
     </div>
 
     <div class="card">
-      <h3>Últimos 6 meses</h3>
-      <table id="hist-table">
-        <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <div class="topbar" style="margin-bottom:var(--space-3)">
+        <h3 style="margin:0">Balance por mes</h3>
+        <select id="year-select" style="width:auto;margin:0"></select>
+      </div>
+      <div class="month-grid" id="month-grid"></div>
     </div>
   </main>
 </div>
@@ -41,11 +42,10 @@
 <script src="js/nav.js"></script>
 <script>
 const fmt = n => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2 });
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+let openMonth = null;
 
-(async () => {
-  const session = await guardPage();
-  if (!session) return;
-
+function renderCategorias() {
   const ym = new Date().toISOString().slice(0, 7);
   const porCat = DB.all(`
     SELECT c.nombre, c.color, SUM(m.monto) as total
@@ -54,9 +54,11 @@ const fmt = n => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2 });
     GROUP BY c.id ORDER BY total DESC`, [ym]);
 
   document.getElementById("empty").style.display = porCat.length ? "none" : "block";
-  const totalGasto = porCat.reduce((sum, r) => sum + r.total, 0) || 1;
+  const totalGasto = porCat.reduce((sum, r) => sum + r.total, 0);
+  document.getElementById("total-gasto").textContent = fmt(totalGasto);
+  const base = totalGasto || 1;
   document.getElementById("bar-chart").innerHTML = porCat.map(r => {
-    const pct = (r.total / totalGasto) * 100;
+    const pct = (r.total / base) * 100;
     return `
     <div style="margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px">
@@ -67,26 +69,58 @@ const fmt = n => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2 });
       </div>
     </div>`;
   }).join("");
+}
 
-  // Últimos 6 meses
-  const months = [...Array(6)].map((_, i) => {
-    const d = new Date(); d.setMonth(d.getMonth() - i);
-    return d.toISOString().slice(0, 7);
-  }).reverse();
+function monthBalance(year, monthIdx) {
+  const ym = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
+  const rows = DB.all("SELECT tipo, SUM(monto) as t FROM movimientos WHERE substr(fecha,1,7)=? GROUP BY tipo", [ym]);
+  const inc = rows.find(r => r.tipo === "ingreso")?.t || 0;
+  const exp = rows.find(r => r.tipo === "gasto")?.t || 0;
+  return { inc, exp, balance: inc - exp };
+}
 
-  const rowsHtml = months.map(m => {
-    const rows = DB.all("SELECT tipo, SUM(monto) as t FROM movimientos WHERE substr(fecha,1,7)=? GROUP BY tipo", [m]);
-    const inc = rows.find(r => r.tipo === "ingreso")?.t || 0;
-    const exp = rows.find(r => r.tipo === "gasto")?.t || 0;
-    const label = new Date(m + "-02").toLocaleDateString("es-ES", { month: "long", year: "numeric" });
-    return `<tr>
-      <td style="text-transform:capitalize">${label}</td>
-      <td class="num income">${fmt(inc)}</td>
-      <td class="num expense">${fmt(exp)}</td>
-      <td class="num ${inc - exp >= 0 ? 'income' : 'expense'}">${fmt(inc - exp)}</td>
-    </tr>`;
+function renderMonthGrid(year) {
+  const grid = document.getElementById("month-grid");
+  grid.innerHTML = MESES.map((nombre, i) => {
+    const { inc, exp, balance } = monthBalance(year, i);
+    const hasData = inc || exp;
+    return `
+    <div class="month-box ${openMonth === i ? 'open' : ''}" data-month="${i}">
+      <div class="month-box-head">
+        <span>${nombre}</span>
+        ${hasData ? `<span class="num ${balance >= 0 ? 'income' : 'expense'}" style="font-size:.8rem">${fmt(balance)}</span>` : `<span style="color:var(--text-muted);font-size:.78rem">—</span>`}
+      </div>
+      <div class="month-box-detail">
+        <div class="num income">Ingresos: ${fmt(inc)}</div>
+        <div class="num expense">Gastos: ${fmt(exp)}</div>
+        <div class="num ${balance >= 0 ? 'income' : 'expense'}">Balance: ${fmt(balance)}</div>
+      </div>
+    </div>`;
   }).join("");
-  document.querySelector("#hist-table tbody").innerHTML = rowsHtml;
+
+  grid.querySelectorAll(".month-box").forEach(box => {
+    box.addEventListener("click", () => {
+      const m = parseInt(box.dataset.month);
+      openMonth = openMonth === m ? null : m;
+      renderMonthGrid(year);
+    });
+  });
+}
+
+(async () => {
+  const session = await guardPage();
+  if (!session) return;
+
+  renderCategorias();
+
+  const thisYear = new Date().getFullYear();
+  const yearSel = document.getElementById("year-select");
+  yearSel.innerHTML = [...Array(11)].map((_, i) => `<option value="${thisYear + i}">${thisYear + i}</option>`).join("");
+  yearSel.addEventListener("change", () => {
+    openMonth = null;
+    renderMonthGrid(parseInt(yearSel.value));
+  });
+  renderMonthGrid(thisYear);
 })();
 </script>
 </body>

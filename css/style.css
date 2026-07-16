@@ -205,8 +205,9 @@ tr.date-sep td {
 .auth-card .brand { justify-content: center; margin-bottom: var(--space-4); font-size: 1.3rem; }
 .tab-row { display: flex; gap: 8px; margin-bottom: var(--space-4); }
 .tab-btn {
-  flex: 1; padding: 8px; text-align: center; border-radius: var(--radius);
-  background: var(--bg-panel-alt); color: var(--text-muted); cursor: pointer; font-size: .85rem;
+  flex: 1; padding: 10px 12px; text-align: center; border-radius: var(--radius);
+  background: var(--bg-panel-alt); color: var(--text-muted); cursor: pointer; font-size: .92rem;
+  border: var(--border-width) solid transparent; box-sizing: border-box;
 }
 .tab-btn.active { color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--accent-income); }
 .checkbox-row { display: flex; align-items: center; gap: 8px; margin: -6px 0 var(--space-3); font-size: .85rem; color: var(--text-muted); }
@@ -224,7 +225,6 @@ tr.date-sep td {
 .empty-state { text-align: center; padding: var(--space-5) 0; color: var(--text-muted); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .74rem; background: var(--bg-panel-alt); color: var(--text-muted); }
 
-/* ---------- Paleta de colores ---------- */
 .color-palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-bottom: var(--space-3); }
 .color-swatch {
   width: 100%; aspect-ratio: 1;

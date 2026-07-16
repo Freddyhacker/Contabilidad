@@ -40,6 +40,7 @@
 <script src="js/db.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/theme.js"></script>
+<script src="js/config.js"></script>
 <script src="js/sheets.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/nav.js"></script>
@@ -93,6 +94,11 @@ function loadPresupuestos() {
     DB.run("INSERT INTO presupuestos (categoria_id, limite) VALUES (?,?)", [catId, limite]);
     await DB.save();
     e.target.reset();
+    loadPresupuestos();
+  });
+
+  window.addEventListener("libro:synced", () => {
+    loadCatSelect();
     loadPresupuestos();
   });
 })();

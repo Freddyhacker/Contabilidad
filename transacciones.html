@@ -43,7 +43,7 @@
         </div>
         <div>
           <label for="m-nota">Nota (opcional)</label>
-          <textarea id="m-nota" rows="8" style="width:100%;min-height:180px;resize:vertical" placeholder="Ej. Renta de julio"></textarea>
+          <textarea id="m-nota" rows="2" style="width:100%;min-height:60px;resize:vertical" placeholder="Ej. Renta de julio"></textarea>
         </div>
       </form>
     </div>
@@ -51,7 +51,7 @@
     <div class="card">
       <h3>Historial</h3>
       <table id="mov-table">
-        <thead><tr><th>Fecha</th><th>Categoría</th><th>Nota</th><th style="text-align:right">Monto</th><th></th></tr></thead>
+        <thead><tr><th>Categoría</th><th>Nota</th><th style="text-align:right">Monto</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
       <div class="empty-state" id="empty" style="display:none">Sin movimientos todavía.</div>
@@ -81,6 +81,12 @@ function loadCategorias() {
     : `<option value="">No hay categorías de ${tipoActual}</option>`;
 }
 
+function fechaLabel(fecha) {
+  const d = new Date(fecha + "T00:00:00");
+  const label = d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function loadMovimientos() {
   const rows = DB.all(`
     SELECT m.*, c.nombre as cat_nombre FROM movimientos m
@@ -88,16 +94,28 @@ function loadMovimientos() {
     ORDER BY m.fecha DESC, m.id DESC`);
   const tbody = document.querySelector("#mov-table tbody");
   document.getElementById("empty").style.display = rows.length ? "none" : "block";
-  tbody.innerHTML = rows.map(r => `
+
+  let html = "";
+  let lastFecha = null;
+  rows.forEach(r => {
+    if (r.fecha !== lastFecha) {
+      const dayTotal = rows.filter(x => x.fecha === r.fecha)
+        .reduce((sum, x) => sum + (x.tipo === "ingreso" ? x.monto : -x.monto), 0);
+      html += `<tr class="date-sep"><td colspan="2">${fechaLabel(r.fecha)}</td>
+        <td class="num ${dayTotal >= 0 ? 'income' : 'expense'}" style="text-align:right">${fmt(dayTotal)}</td><td></td></tr>`;
+      lastFecha = r.fecha;
+    }
+    html += `
     <tr>
-      <td>${r.fecha}</td>
       <td>${r.cat_nombre || "—"}</td>
       <td>${r.nota || ""}</td>
       <td class="num ${r.tipo === 'ingreso' ? 'income' : 'expense'}" style="text-align:right">
         ${r.tipo === 'ingreso' ? '+' : '-'}${fmt(r.monto)}
       </td>
       <td><a href="#" data-id="${r.id}" class="del-link" style="color:var(--accent-danger)">Eliminar</a></td>
-    </tr>`).join("");
+    </tr>`;
+  });
+  tbody.innerHTML = html;
 
   tbody.querySelectorAll(".del-link").forEach(a => a.addEventListener("click", async (e) => {
     e.preventDefault();

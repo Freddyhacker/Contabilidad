@@ -24,9 +24,10 @@
             <div class="tab-btn active" data-tipo="gasto">Gasto</div>
             <div class="tab-btn" data-tipo="ingreso">Ingreso</div>
           </div>
-          <label for="c-color">Color</label>
-          <input id="c-color" type="color" value="#7ca982">
-          <button class="btn btn-block" type="submit">Agregar categoría</button>
+          <label>Color</label>
+          <input type="hidden" id="c-color" value="#7ca982">
+          <div class="color-palette" id="c-color-swatches"></div>
+          <button class="btn btn-block" type="submit" style="margin-top:var(--space-3)">Agregar categoría</button>
         </form>
       </div>
 
@@ -60,6 +61,51 @@
 let tipoFiltro = "gasto";
 let tipoNuevo = "gasto";
 
+const PALETTE = [
+  "#e57373","#ef5350","#f06292","#ba68c8","#9575cd","#7986cb","#64b5f6","#4fc3f7",
+  "#4dd0e1","#4db6ac","#81c784","#aed581","#dce775","#ffd54f","#ffb74d","#ff8a65",
+  "#a1887f","#90a4ae","#78909c","#7ca982","#e3a857","#d9695f","#6b9873","#c96a4f",
+  "#5b8a9a","#8e7cc3","#c9a15a","#4a7c6f","#b5566b","#8d99ae"
+];
+
+function renderSwatches(containerId, selected, onPick) {
+  const wrap = document.getElementById(containerId);
+  wrap.innerHTML = PALETTE.map(hex => `
+    <button type="button" class="color-swatch ${hex === selected ? 'active' : ''}" data-color="${hex}" style="background:${hex}"></button>
+  `).join("");
+  wrap.querySelectorAll(".color-swatch").forEach(btn => btn.addEventListener("click", () => {
+    wrap.querySelectorAll(".color-swatch").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    onPick(btn.dataset.color);
+  }));
+}
+
+// Popover flotante con la paleta, usado para cambiar el color de una categoría existente
+function openPalette(anchorEl, currentColor, onPick) {
+  document.querySelectorAll(".palette-popover").forEach(p => p.remove());
+  const rect = anchorEl.getBoundingClientRect();
+  const pop = document.createElement("div");
+  pop.className = "palette-popover color-palette";
+  pop.style.top = `${rect.bottom + window.scrollY + 6}px`;
+  pop.style.left = `${rect.left + window.scrollX}px`;
+  pop.innerHTML = PALETTE.map(hex => `
+    <button type="button" class="color-swatch ${hex === currentColor ? 'active' : ''}" data-color="${hex}" style="background:${hex}"></button>
+  `).join("");
+  document.body.appendChild(pop);
+
+  pop.querySelectorAll(".color-swatch").forEach(btn => btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onPick(btn.dataset.color);
+    pop.remove();
+  }));
+
+  setTimeout(() => {
+    document.addEventListener("click", function closeOnOutside(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("click", closeOnOutside); }
+    });
+  }, 0);
+}
+
 document.querySelectorAll("#c-tipo-tabs .tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("#c-tipo-tabs .tab-btn").forEach(b => b.classList.remove("active"));
@@ -74,10 +120,18 @@ function loadCategorias() {
   document.getElementById("empty").style.display = cats.length ? "none" : "block";
   tbody.innerHTML = cats.map(c => `
     <tr>
-      <td><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${c.color}"></span></td>
+      <td><button type="button" class="color-swatch-btn" data-id="${c.id}" data-color="${c.color}" style="width:20px;height:20px;border-radius:5px;background:${c.color};border:1px solid var(--border-color);cursor:pointer;padding:0"></button></td>
       <td>${c.nombre}</td>
       <td><a href="#" data-id="${c.id}" class="del-link" style="color:var(--accent-danger)">Eliminar</a></td>
     </tr>`).join("");
+
+  tbody.querySelectorAll(".color-swatch-btn").forEach(btn => btn.addEventListener("click", () => {
+    openPalette(btn, btn.dataset.color, async (hex) => {
+      DB.run("UPDATE categorias SET color = ? WHERE id = ?", [hex, btn.dataset.id]);
+      await DB.save();
+      loadCategorias();
+    });
+  }));
 
   tbody.querySelectorAll(".del-link").forEach(a => a.addEventListener("click", async (e) => {
     e.preventDefault();
@@ -100,6 +154,9 @@ document.querySelectorAll("#cat-tabs .tab-btn").forEach(tab => {
   const session = await guardPage();
   if (!session) return;
   loadCategorias();
+  renderSwatches("c-color-swatches", document.getElementById("c-color").value, (hex) => {
+    document.getElementById("c-color").value = hex;
+  });
 
   document.getElementById("cat-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -110,6 +167,9 @@ document.querySelectorAll("#cat-tabs .tab-btn").forEach(tab => {
     await DB.save();
     e.target.reset();
     document.getElementById("c-color").value = "#7ca982";
+    renderSwatches("c-color-swatches", "#7ca982", (hex) => {
+      document.getElementById("c-color").value = hex;
+    });
     document.querySelectorAll("#c-tipo-tabs .tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelector('#c-tipo-tabs .tab-btn[data-tipo="gasto"]').classList.add("active");
     tipoNuevo = "gasto";

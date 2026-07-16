@@ -31,12 +31,21 @@ const Sheets = (() => {
     return !!(c.webAppUrl && c.secret);
   }
 
-  async function call(body) {
+  async function call(body, opts = {}) {
     const { webAppUrl, secret } = getConfig();
-    const res = await fetch(webAppUrl, {
-      method: "POST",
-      body: JSON.stringify({ ...body, secret }),
-    });
+    const payload = JSON.stringify({ ...body, secret });
+    let res;
+    try {
+      // keepalive: la petición sigue viva aunque cambies de página o
+      // cierres la pestaña justo después de guardar
+      res = await fetch(webAppUrl, { method: "POST", body: payload, keepalive: !!opts.keepalive });
+    } catch (err) {
+      // keepalive tiene un límite de ~64KB por petición; si el libro ya
+      // creció mucho, se reintenta normal (ya no sobrevive a la navegación,
+      // pero al menos no falla)
+      if (opts.keepalive) res = await fetch(webAppUrl, { method: "POST", body: payload });
+      else throw err;
+    }
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     return data;
@@ -45,7 +54,7 @@ const Sheets = (() => {
   // Sube filas cifradas a una pestaña (una pestaña = una categoría de datos)
   async function pushEncryptedRows(tabName, rows, dataKey) {
     const encryptedRows = await Promise.all(rows.map(r => Crypto.encryptJSON(r, dataKey)));
-    await call({ action: "push", tab: tabName, rows: encryptedRows });
+    await call({ action: "push", tab: tabName, rows: encryptedRows }, { keepalive: true });
   }
 
   async function pullEncryptedRows(tabName, dataKey) {

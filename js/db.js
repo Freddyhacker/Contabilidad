@@ -82,6 +82,21 @@ const DB = (() => {
     });
   }
 
+  // Reemplaza TODO el contenido de una tabla con lo que viene de Sheets
+  // (a diferencia de importRemote, esto sí refleja borrados hechos en otro
+  // dispositivo). Se usa en el sondeo periódico de cambios remotos.
+  function replaceAll(tabName, rows) {
+    const cols = TABLE_COLUMNS[tabName];
+    if (!cols || !rows) return;
+    sqlite.run(`DELETE FROM ${tabName}`);
+    rows.forEach(r => {
+      sqlite.run(
+        `INSERT INTO ${tabName} (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`,
+        cols.map(c => r[c] ?? null)
+      );
+    });
+  }
+
   async function persist() {
     const bytes = sqlite.export();
     let bin = "";
@@ -102,10 +117,10 @@ const DB = (() => {
     return values.map(row => Object.fromEntries(row.map((v, i) => [columns[i], v])));
   }
 
-  async function save() {
+  async function save(opts = {}) {
     await persist();
-    if (typeof Sync !== "undefined") Sync.markDirty(dataKey);
+    if (!opts.silent && typeof Sync !== "undefined") Sync.markDirty(dataKey);
   }
 
-  return { initEmpty, load, run, all, save, importRemote };
+  return { initEmpty, load, run, all, save, importRemote, replaceAll };
 })();

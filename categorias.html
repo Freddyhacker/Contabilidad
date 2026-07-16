@@ -175,6 +175,8 @@ document.querySelectorAll("#cat-tabs .tab-btn").forEach(tab => {
     tipoNuevo = "gasto";
     loadCategorias();
   });
+
+  window.addEventListener("libro:synced", loadCategorias);
 })();
 </script>
 </body>

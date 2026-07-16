@@ -63,17 +63,19 @@ async function guardPage() {
   const session = await Auth.restoreSession();
   if (!session) { location.href = "index.html"; return null; }
   renderSidebar(location.pathname.split("/").pop(), session);
-  if (typeof Sync !== "undefined") {
-    Sync.setLed(document.querySelectorAll(".sync-led"), session.dataKey);
-    Sync.startPolling();
-  }
-  // Apariencia: se guarda por usuario dentro de la lista sincronizada.
-  // Se trae una vez por carga de página (no en el sondeo de 5s, para no
-  // sumarle más llamadas a Sheets) y se aplica si hay una guardada.
+  if (typeof Sync !== "undefined") Sync.setLed(document.querySelectorAll(".sync-led"), session.dataKey);
+
+  // Apariencia: se aplica de inmediato con lo que ya hay guardado en este
+  // dispositivo (rápido, sin esperar red).
   if (typeof Auth !== "undefined" && typeof Theme !== "undefined") {
-    if (typeof Sheets !== "undefined" && Sheets.isConfigured()) await Auth.pullUsersFromSheets();
     const theme = await Auth.getUserTheme(session.username);
     if (theme && Object.keys(theme).length) Theme.apply(theme);
   }
+  document.getElementById("boot-loading")?.classList.add("hide");
+
+  // Revisión de cambios remotos: en SEGUNDO PLANO, sin esperar (no bloquea
+  // la pantalla). Si hay algo nuevo de otro dispositivo, se aplica solo.
+  if (typeof Sync !== "undefined") Sync.checkRemoteChanges();
+
   return session;
 }

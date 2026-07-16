@@ -121,6 +121,11 @@ function renderMonthGrid(year) {
     renderMonthGrid(parseInt(yearSel.value));
   });
   renderMonthGrid(thisYear);
+
+  window.addEventListener("libro:synced", () => {
+    renderCategorias();
+    renderMonthGrid(parseInt(yearSel.value));
+  });
 })();
 </script>
 </body>

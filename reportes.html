@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 <div class="app-shell">
   <nav class="sidebar" id="sidebar-mount"></nav>
   <main class="main">
@@ -79,7 +80,15 @@ function monthBalance(year, monthIdx) {
   const rows = DB.all("SELECT tipo, SUM(monto) as t FROM movimientos WHERE substr(fecha,1,7)=? GROUP BY tipo", [ym]);
   const inc = rows.find(r => r.tipo === "ingreso")?.t || 0;
   const exp = rows.find(r => r.tipo === "gasto")?.t || 0;
-  return { inc, exp, balance: inc - exp };
+
+  // El balance es ACUMULADO (arrastra lo de meses anteriores), igual que
+  // el balance total del dashboard — no solo lo que entró/salió ese mes.
+  const hastaFinDeMes = `${ym}-32`; // truco: cualquier fecha del mes es menor a esto como texto
+  const cum = DB.all("SELECT tipo, SUM(monto) as t FROM movimientos WHERE fecha < ? GROUP BY tipo", [hastaFinDeMes]);
+  const cumInc = cum.find(r => r.tipo === "ingreso")?.t || 0;
+  const cumExp = cum.find(r => r.tipo === "gasto")?.t || 0;
+
+  return { inc, exp, balance: cumInc - cumExp };
 }
 
 function renderMonthGrid(year) {
@@ -96,7 +105,8 @@ function renderMonthGrid(year) {
       <div class="month-box-detail">
         <div class="num income">Ingresos: ${fmt(inc)}</div>
         <div class="num expense">Gastos: ${fmt(exp)}</div>
-        <div class="num ${balance >= 0 ? 'income' : 'expense'}">Balance: ${fmt(balance)}</div>
+        <div class="num ${balance >= 0 ? 'income' : 'expense'}">Balance acumulado: ${fmt(balance)}</div>
+        <div style="color:var(--text-muted);font-size:.76rem;margin-top:2px">Incluye todo hasta fin de este mes</div>
       </div>
     </div>`;
   }).join("");

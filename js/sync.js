@@ -44,7 +44,7 @@ const Sync = (() => {
     if (key) dataKey = key;
     localStorage.setItem(PENDING_KEY, "1");
     updateLed();
-    if (Sheets.isConfigured() && navigator.onLine) scheduleSync(800);
+    if (Sheets.isConfigured() && navigator.onLine) scheduleSync(350);
   }
 
   function scheduleSync(delay) {
@@ -60,9 +60,13 @@ const Sync = (() => {
       const movimientos = DB.all("SELECT * FROM movimientos");
       const categorias = DB.all("SELECT * FROM categorias");
       const presupuestos = DB.all("SELECT * FROM presupuestos");
-      await Sheets.pushEncryptedRows("movimientos", movimientos, dataKey);
-      await Sheets.pushEncryptedRows("categorias", categorias, dataKey);
-      await Sheets.pushEncryptedRows("presupuestos", presupuestos, dataKey);
+      // Las 3 pestañas se suben en paralelo (antes era una por una, que
+      // triplicaba el tiempo de espera por la latencia de Apps Script)
+      await Promise.all([
+        Sheets.pushEncryptedRows("movimientos", movimientos, dataKey),
+        Sheets.pushEncryptedRows("categorias", categorias, dataKey),
+        Sheets.pushEncryptedRows("presupuestos", presupuestos, dataKey),
+      ]);
       localStorage.removeItem(PENDING_KEY);
     } catch (err) {
       // se queda "pendiente"; se reintentará en el próximo cambio o reconexión

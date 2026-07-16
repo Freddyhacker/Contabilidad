@@ -34,6 +34,22 @@ const Auth = (() => {
     return Crypto.deriveKey(secret, USERS_SALT_B64);
   }
 
+  // La apariencia (tema) se guarda dentro del registro del propio usuario,
+  // así cada quien tiene la suya y viaja junto con la lista de usuarios.
+  async function saveUserTheme(username, theme) {
+    const users = await getUsers();
+    const u = users.find(x => x.username === username);
+    if (!u) return;
+    u.theme = theme;
+    await saveUsers(users);
+    await pushUsersToSheets();
+  }
+
+  async function getUserTheme(username) {
+    const users = await getUsers();
+    return users.find(u => u.username === username)?.theme || null;
+  }
+
   async function pushUsersToSheets() {
     if (typeof Sheets === "undefined" || !Sheets.isConfigured()) return;
     const key = await usersRemoteKey();
@@ -199,6 +215,6 @@ const Auth = (() => {
     hasAnyUser, registerFirstAdmin, addUser, login,
     adminResetPassword, rememberDevice, tryAutoLogin, forgetDevice,
     currentSession, logout, getUsers, restoreSession, storeSessionKey,
-    pushUsersToSheets, pullUsersFromSheets
+    pushUsersToSheets, pullUsersFromSheets, saveUserTheme, getUserTheme
   };
 })();

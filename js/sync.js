@@ -101,5 +101,58 @@ const Sync = (() => {
     }
   }
 
-  return { setLed, markDirty, updateLed, doSync, pullAll };
+  // ---------- Sondeo periódico de cambios remotos ----------
+  // Cada 5s revisa si el Sheet cambió (por ejemplo, un movimiento agregado
+  // desde otro dispositivo) y si es así lo baja automáticamente.
+  // Nota: esto multiplica las llamadas a tu Apps Script — si algún día ves
+  // errores de cuota de Google, sube POLL_INTERVAL_MS.
+  const POLL_INTERVAL_MS = 5000;
+  let pollTimer = null;
+  let polling = false;
+
+  function canonical(rows) {
+    return JSON.stringify(
+      [...rows].map(r => ({ ...r, id: Number(r.id) })).sort((a, b) => a.id - b.id)
+    );
+  }
+
+  async function pollTick() {
+    if (polling || syncing || document.hidden) return;
+    if (!dataKey || !Sheets.isConfigured() || !navigator.onLine) return;
+    // si hay cambios locales sin subir, primero se suben para no perderlos
+    if (isPending()) await doSync();
+
+    polling = true;
+    try {
+      const [remoteCategorias, remoteMovimientos, remotePresupuestos] = await Promise.all([
+        Sheets.pullEncryptedRows("categorias", dataKey),
+        Sheets.pullEncryptedRows("movimientos", dataKey),
+        Sheets.pullEncryptedRows("presupuestos", dataKey),
+      ]);
+      const remoteChanged =
+        canonical(remoteCategorias) !== canonical(DB.all("SELECT * FROM categorias")) ||
+        canonical(remoteMovimientos) !== canonical(DB.all("SELECT * FROM movimientos")) ||
+        canonical(remotePresupuestos) !== canonical(DB.all("SELECT * FROM presupuestos"));
+
+      if (remoteChanged) {
+        DB.replaceAll("categorias", remoteCategorias);
+        DB.replaceAll("movimientos", remoteMovimientos);
+        DB.replaceAll("presupuestos", remotePresupuestos);
+        await DB.save({ silent: true }); // no volver a subir lo que se acaba de bajar
+        window.dispatchEvent(new CustomEvent("libro:synced"));
+      }
+    } catch (err) {
+      // se reintenta en el siguiente tick
+    }
+    polling = false;
+  }
+
+  function startPolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(pollTick, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) pollTick(); });
+    window.addEventListener("online", pollTick);
+  }
+
+  return { setLed, markDirty, updateLed, doSync, pullAll, startPolling };
 })();

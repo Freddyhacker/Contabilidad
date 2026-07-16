@@ -6,6 +6,9 @@
 <title>Libro — Ingresos y gastos</title>
 <link rel="stylesheet" href="css/variables.css">
 <link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16222c">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
 <div class="app-shell">
@@ -36,15 +39,12 @@
             <label for="m-cat">Categoría</label>
             <select id="m-cat" style="width:100%"></select>
           </div>
-          <div>
-            <label>&nbsp;</label>
-            <button class="btn" type="submit">Guardar</button>
-          </div>
         </div>
         <div>
           <label for="m-nota">Nota (opcional)</label>
           <textarea id="m-nota" rows="2" style="width:100%;min-height:60px;resize:vertical" placeholder="Ej. Renta de julio"></textarea>
         </div>
+        <button class="btn" type="submit" style="margin-top:var(--space-2)">Guardar</button>
       </form>
     </div>
 

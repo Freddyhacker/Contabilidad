@@ -19,20 +19,16 @@ function renderSidebar(activeHref, session) {
 
   const initials = (session?.username || "?").slice(0, 2).toUpperCase();
 
-  const brandHtml = `
-    <span class="ledger-mark"></span>Libro
-    <span class="sync-led" style="width:9px;height:9px;border-radius:50%;background:var(--accent-danger);margin-left:2px"></span>`;
+  const markHtml = `<span class="ledger-mark"></span>Libro`;
 
   document.getElementById("sidebar-mount").innerHTML = `
     <div class="mobile-topbar">
-      <button class="hamburger" id="menu-toggle" aria-label="Abrir menú">
-        <span></span><span></span><span></span>
-      </button>
-      <div class="brand">${brandHtml}</div>
+      <button class="brand brand-toggle" id="menu-toggle" aria-label="Abrir menú">${markHtml}</button>
+      <span class="sync-led" style="width:9px;height:9px;border-radius:50%;background:var(--accent-danger)"></span>
     </div>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <div class="sidebar-inner" id="sidebar-inner">
-      <div class="brand">${brandHtml}</div>
+      <div class="brand">${markHtml}<span class="sync-led" style="width:9px;height:9px;border-radius:50%;background:var(--accent-danger);margin-left:2px"></span></div>
       <ul class="nav-list">${items}</ul>
       <div class="sidebar-footer">
         <div class="user-row">
@@ -70,6 +66,14 @@ async function guardPage() {
   if (typeof Sync !== "undefined") {
     Sync.setLed(document.querySelectorAll(".sync-led"), session.dataKey);
     Sync.startPolling();
+  }
+  // Apariencia: se guarda por usuario dentro de la lista sincronizada.
+  // Se trae una vez por carga de página (no en el sondeo de 5s, para no
+  // sumarle más llamadas a Sheets) y se aplica si hay una guardada.
+  if (typeof Auth !== "undefined" && typeof Theme !== "undefined") {
+    if (typeof Sheets !== "undefined" && Sheets.isConfigured()) await Auth.pullUsersFromSheets();
+    const theme = await Auth.getUserTheme(session.username);
+    if (theme && Object.keys(theme).length) Theme.apply(theme);
   }
   return session;
 }

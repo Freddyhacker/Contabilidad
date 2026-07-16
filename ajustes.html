@@ -6,6 +6,9 @@
 <title>Libro — Ajustes</title>
 <link rel="stylesheet" href="css/variables.css">
 <link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16222c">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 </head>
 <body>
 <div class="app-shell">
@@ -108,12 +111,13 @@ async function loadUsers(currentUsername) {
   if (!session) return;
 
   renderThemeControls();
-  document.getElementById("theme-save").addEventListener("click", () => {
+  document.getElementById("theme-save").addEventListener("click", async () => {
     const values = {};
     document.querySelectorAll("#theme-controls input").forEach(i => {
       values[i.dataset.var] = i.type === "range" ? i.value + "px" : i.value;
     });
     Theme.save(values);
+    await Auth.saveUserTheme(session.username, values);
   });
   document.getElementById("theme-reset").addEventListener("click", () => Theme.reset());
 

@@ -101,14 +101,12 @@ const Sync = (() => {
     }
   }
 
-  // ---------- Sondeo periódico de cambios remotos ----------
-  // Cada 5s revisa si el Sheet cambió (por ejemplo, un movimiento agregado
-  // desde otro dispositivo) y si es así lo baja automáticamente.
-  // Nota: esto multiplica las llamadas a tu Apps Script — si algún día ves
-  // errores de cuota de Google, sube POLL_INTERVAL_MS.
-  const POLL_INTERVAL_MS = 5000;
-  let pollTimer = null;
-  let polling = false;
+  // ---------- Revisión de cambios remotos ----------
+  // Se llama UNA VEZ por carga de página (no en un timer), en segundo
+  // plano: la pantalla ya se muestra con los datos locales (rápido) y
+  // esto solo actualiza si de verdad hay algo distinto en el Sheet
+  // (por ejemplo, un movimiento agregado desde otro dispositivo).
+  let checking = false;
 
   function canonical(rows) {
     return JSON.stringify(
@@ -116,13 +114,13 @@ const Sync = (() => {
     );
   }
 
-  async function pollTick() {
-    if (polling || syncing || document.hidden) return;
+  async function checkRemoteChanges() {
+    if (checking || syncing) return;
     if (!dataKey || !Sheets.isConfigured() || !navigator.onLine) return;
     // si hay cambios locales sin subir, primero se suben para no perderlos
     if (isPending()) await doSync();
 
-    polling = true;
+    checking = true;
     try {
       const [remoteCategorias, remoteMovimientos, remotePresupuestos] = await Promise.all([
         Sheets.pullEncryptedRows("categorias", dataKey),
@@ -142,17 +140,10 @@ const Sync = (() => {
         window.dispatchEvent(new CustomEvent("libro:synced"));
       }
     } catch (err) {
-      // se reintenta en el siguiente tick
+      // no pasa nada: se reintenta en la próxima carga de página
     }
-    polling = false;
+    checking = false;
   }
 
-  function startPolling() {
-    if (pollTimer) return;
-    pollTimer = setInterval(pollTick, POLL_INTERVAL_MS);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) pollTick(); });
-    window.addEventListener("online", pollTick);
-  }
-
-  return { setLed, markDirty, updateLed, doSync, pullAll, startPolling };
+  return { setLed, markDirty, updateLed, doSync, pullAll, checkRemoteChanges };
 })();

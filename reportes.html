@@ -63,6 +63,7 @@
         <h3 style="margin:0">Balance por mes</h3>
         <select id="year-select" style="width:auto;margin:0"></select>
       </div>
+      <div id="trend-chart" style="margin-bottom:var(--space-4)"></div>
       <div class="month-grid" id="month-grid"></div>
     </div>
   </main>
@@ -109,26 +110,41 @@ function renderCategorias() {
   }).join("");
 }
 
-function monthBalance(year, monthIdx) {
-  const ym = `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
-  const rows = DB.all("SELECT tipo, SUM(monto) as t FROM movimientos WHERE substr(fecha,1,7)=? GROUP BY tipo", [ym]);
-  const inc = rows.find(r => r.tipo === "ingreso")?.t || 0;
-  const exp = rows.find(r => r.tipo === "gasto")?.t || 0;
+// Antes esto hacía 2 consultas POR MES (24 en total) para armar el
+// calendario. Ahora es 1 consulta agrupada por mes + 1 para el arrastre
+// inicial (2 en total), y con eso se calcula el balance acumulado de los
+// 12 meses en JS. El calendario y la gráfica de tendencia reusan el mismo
+// resultado en vez de volver a consultar la base cada uno por su lado.
+function computeYearData(year) {
+  const rows = DB.all(
+    `SELECT substr(fecha,1,7) as ym, tipo, SUM(monto) as t
+     FROM movimientos WHERE substr(fecha,1,4)=? GROUP BY ym, tipo`,
+    [String(year)]
+  );
+  const byMonth = {};
+  rows.forEach(r => {
+    const i = parseInt(r.ym.slice(5, 7)) - 1;
+    byMonth[i] = byMonth[i] || { inc: 0, exp: 0 };
+    byMonth[i][r.tipo === "ingreso" ? "inc" : "exp"] = r.t;
+  });
 
-  // El balance es ACUMULADO (arrastra lo de meses anteriores), igual que
-  // el balance total del dashboard — no solo lo que entró/salió ese mes.
-  const hastaFinDeMes = `${ym}-32`; // truco: cualquier fecha del mes es menor a esto como texto
-  const cum = DB.all("SELECT tipo, SUM(monto) as t FROM movimientos WHERE fecha < ? GROUP BY tipo", [hastaFinDeMes]);
-  const cumInc = cum.find(r => r.tipo === "ingreso")?.t || 0;
-  const cumExp = cum.find(r => r.tipo === "gasto")?.t || 0;
+  const antes = DB.all(
+    "SELECT tipo, SUM(monto) as t FROM movimientos WHERE fecha < ? GROUP BY tipo",
+    [`${year}-01-01`]
+  );
+  let running = (antes.find(r => r.tipo === "ingreso")?.t || 0) - (antes.find(r => r.tipo === "gasto")?.t || 0);
 
-  return { inc, exp, balance: cumInc - cumExp };
+  return MESES.map((_, i) => {
+    const { inc = 0, exp = 0 } = byMonth[i] || {};
+    running += inc - exp;
+    return { inc, exp, balance: running };
+  });
 }
 
-function renderMonthGrid(year) {
+function renderMonthGrid(year, yearData) {
   const grid = document.getElementById("month-grid");
   grid.innerHTML = MESES.map((nombre, i) => {
-    const { inc, exp, balance } = monthBalance(year, i);
+    const { inc, exp, balance } = yearData[i];
     const hasData = inc || exp;
     return `
     <div class="month-box ${openMonth === i ? 'open' : ''}" data-month="${i}">
@@ -149,9 +165,37 @@ function renderMonthGrid(year) {
     box.addEventListener("click", () => {
       const m = parseInt(box.dataset.month);
       openMonth = openMonth === m ? null : m;
-      renderMonthGrid(year);
+      renderMonthGrid(year, yearData);
     });
   });
+}
+
+function renderTrendChart(yearData) {
+  const balances = yearData.map(m => m.balance);
+  const w = 600, h = 150, pad = 8;
+  const max = Math.max(...balances, 0);
+  const min = Math.min(...balances, 0);
+  const range = (max - min) || 1;
+  const stepX = (w - pad * 2) / (balances.length - 1);
+  const y = v => h - pad - ((v - min) / range) * (h - pad * 2);
+  const points = balances.map((v, i) => `${pad + i * stepX},${y(v)}`).join(" ");
+  const zeroY = y(0);
+
+  document.getElementById("trend-chart").innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:150px;display:block" preserveAspectRatio="none">
+      <line x1="${pad}" y1="${zeroY}" x2="${w - pad}" y2="${zeroY}" stroke="var(--border-color)" stroke-dasharray="4 3"/>
+      <polyline points="${points}" fill="none" stroke="var(--accent-income)" stroke-width="2"/>
+      ${balances.map((v, i) => `<circle cx="${pad + i * stepX}" cy="${y(v)}" r="3" fill="${v >= 0 ? 'var(--accent-income)' : 'var(--accent-expense)'}"/>`).join("")}
+    </svg>
+    <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text-muted);margin-top:4px">
+      ${MESES.map(m => `<span>${m.slice(0, 3)}</span>`).join("")}
+    </div>`;
+}
+
+function renderYear(year) {
+  const yearData = computeYearData(year);
+  renderMonthGrid(year, yearData);
+  renderTrendChart(yearData);
 }
 
 (async () => {
@@ -165,13 +209,13 @@ function renderMonthGrid(year) {
   yearSel.innerHTML = [...Array(11)].map((_, i) => `<option value="${thisYear + i}">${thisYear + i}</option>`).join("");
   yearSel.addEventListener("change", () => {
     openMonth = null;
-    renderMonthGrid(parseInt(yearSel.value));
+    renderYear(parseInt(yearSel.value));
   });
-  renderMonthGrid(thisYear);
+  renderYear(thisYear);
 
   window.addEventListener("libro:synced", () => {
     renderCategorias();
-    renderMonthGrid(parseInt(yearSel.value));
+    renderYear(parseInt(yearSel.value));
   });
 })();
 </script>

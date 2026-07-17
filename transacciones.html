@@ -132,10 +132,13 @@ function loadMovimientos() {
 
   let html = "";
   let lastFecha = null;
+  const dayTotals = {};
+  rows.forEach(r => {
+    dayTotals[r.fecha] = (dayTotals[r.fecha] || 0) + (r.tipo === "ingreso" ? r.monto : -r.monto);
+  });
   rows.forEach(r => {
     if (r.fecha !== lastFecha) {
-      const dayTotal = rows.filter(x => x.fecha === r.fecha)
-        .reduce((sum, x) => sum + (x.tipo === "ingreso" ? x.monto : -x.monto), 0);
+      const dayTotal = dayTotals[r.fecha];
       html += `<tr class="date-sep"><td colspan="2">${fechaLabel(r.fecha)}</td>
         <td class="num ${dayTotal >= 0 ? 'income' : 'expense'}" style="text-align:right">${fmt(dayTotal)}</td><td></td></tr>`;
       lastFecha = r.fecha;

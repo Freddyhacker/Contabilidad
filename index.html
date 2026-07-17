@@ -9,8 +9,10 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#16222c">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="prefetch" href="dashboard.html">
 </head>
 <body>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 <div class="auth-wrap">
   <div class="auth-card">
     <div class="brand"><span class="ledger-mark"></span>Libro</div>
@@ -66,7 +68,7 @@ document.querySelectorAll(".tab-btn").forEach(tab => {
 // Si ya hay sesión guardada (recuérdame), entra directo
 (async () => {
   const session = await Auth.tryAutoLogin();
-  if (session) location.href = "dashboard.html";
+  if (session) { location.href = "dashboard.html"; return; }
 })();
 
 document.getElementById("login-form").addEventListener("submit", async (e) => {

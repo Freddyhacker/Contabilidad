@@ -4,6 +4,15 @@
    página (no se genera con JS) para que no haya parpadeo al cargar.
    ============================================ */
 
+// Si el navegador restaura esta página desde su caché de atrás/adelante
+// (bfcache), es una "foto" congelada de como quedó pintada — no vuelve a
+// correr guardPage(). Si mientras tanto cerraste sesión, verías la página
+// autenticada sin pedir usuario/contraseña. Forzamos una recarga real para
+// que se revise la sesión de nuevo.
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) location.reload();
+});
+
 function renderSidebar(session) {
   const initials = (session?.username || "?").slice(0, 2).toUpperCase();
   document.getElementById("user-avatar").textContent = initials;

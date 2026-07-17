@@ -9,10 +9,43 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#16222c">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="prefetch" href="transacciones.html">
+<link rel="prefetch" href="presupuestos.html">
+<link rel="prefetch" href="reportes.html">
+<link rel="prefetch" href="categorias.html">
+<link rel="prefetch" href="ajustes.html">
 </head>
 <body>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 <div class="app-shell">
-  <nav class="sidebar" id="sidebar-mount"></nav>
+  <nav class="sidebar" id="sidebar-mount">
+    <div class="mobile-topbar">
+      <button class="brand brand-toggle" id="menu-toggle" aria-label="Abrir menú"><span class="ledger-mark"></span>Libro</button>
+      <span class="sync-led" style="width:9px;height:9px;border-radius:50%;background:var(--accent-danger)"></span>
+    </div>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <div class="sidebar-inner" id="sidebar-inner">
+      <div class="brand"><span class="ledger-mark"></span>Libro<span class="sync-led" style="width:9px;height:9px;border-radius:50%;background:var(--accent-danger);margin-left:2px"></span></div>
+      <ul class="nav-list">
+      <li><a href="dashboard.html" class="active"><span class="ico">◆</span>Dashboard</a></li>
+      <li><a href="transacciones.html"><span class="ico">≡</span>Ingresos y gastos</a></li>
+      <li><a href="presupuestos.html"><span class="ico">◧</span>Presupuestos</a></li>
+      <li><a href="reportes.html"><span class="ico">▤</span>Reportes</a></li>
+      <li><a href="categorias.html"><span class="ico">●</span>Categorías</a></li>
+      <li><a href="ajustes.html"><span class="ico">⚙</span>Ajustes</a></li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="user-row">
+          <div class="avatar" id="user-avatar">··</div>
+          <div>
+            <div style="color:var(--text-primary)" id="user-name"></div>
+            <span class="badge" id="user-role">Usuario</span>
+          </div>
+        </div>
+        <a href="#" id="logout-link">Cerrar sesión</a>
+      </div>
+    </div>
+  </nav>
   <main class="main">
     <div class="topbar">
       <div><h1>Dashboard</h1><div class="sub" id="today-label"></div></div>

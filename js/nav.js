@@ -51,7 +51,11 @@ async function guardPage() {
 
   // Revisión de cambios remotos: en SEGUNDO PLANO, sin esperar (no bloquea
   // la pantalla). Si hay algo nuevo de otro dispositivo, se aplica solo.
-  if (typeof Sync !== "undefined") Sync.checkRemoteChanges();
+  // Además queda vigilando (al volver a la pestaña + sondeo ligero).
+  if (typeof Sync !== "undefined") {
+    Sync.checkRemoteChanges();
+    Sync.startWatching();
+  }
 
   return session;
 }

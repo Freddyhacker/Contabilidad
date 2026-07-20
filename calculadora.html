@@ -125,16 +125,19 @@
 <script src="js/sync.js"></script>
 <script src="js/nav.js"></script>
 <script>
-let expr = "";      // lo que se va construyendo (con Math.sin( etc.)
-let displayExpr = ""; // lo mismo pero legible para el usuario
-let deg = true;      // grados por defecto (más intuitivo que radianes)
+// Cada tecla presionada se guarda como un "token" con dos formas:
+//  - op: lo que se evalúa (ej. "sqrt(", "/", "^")
+//  - label: lo que se ve en pantalla (ej. "√(", "÷", "^") — así nunca se
+//    desincroniza lo que ves de lo que se calcula, y Borrar quita un
+//    símbolo completo a la vez, no un carácter suelto.
+let tokens = [];
+let deg = true; // grados por defecto (más intuitivo que radianes)
 let memory = 0;
 
 const exprEl = document.getElementById("calc-expr");
 const dispEl = document.getElementById("calc-display");
 
 function toRad(x) { return deg ? x * Math.PI / 180 : x; }
-// Envolturas que respetan grados/radianes para las funciones trigonométricas
 const sin = x => Math.sin(toRad(x));
 const cos = x => Math.cos(toRad(x));
 const tan = x => Math.tan(toRad(x));
@@ -143,33 +146,49 @@ const ln = x => Math.log(x);
 const sqrt = x => Math.sqrt(x);
 const pi = Math.PI;
 
-function render() {
-  exprEl.textContent = displayExpr || "";
-  dispEl.textContent = expr === "" ? "0" : displayExpr;
+function exprString() { return tokens.map(t => t.op).join(""); }
+function labelString() { return tokens.map(t => t.label).join(""); }
+
+// Convierte "12÷5" en una fracción de dos pisos, y "2^3" en un exponente
+// elevado — así se ve "multinivel" en vez de puro texto en línea.
+function prettyHTML(s) {
+  let html = s
+    .replace(/(\d+\.?\d*)÷(\d+\.?\d*)/g, '<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>')
+    .replace(/(\d+\.?\d*)÷(?!\d)/g, '<span class="frac"><span class="num">$1</span><span class="den">&nbsp;</span></span>')
+    .replace(/(\d+\.?\d*)\^(\d+\.?\d*)/g, '$1<sup>$2</sup>');
+  return html || "0";
 }
 
-function append(op, label) {
-  expr += op;
-  displayExpr += (label ?? op);
+function render() {
+  exprEl.textContent = labelString();
+  dispEl.innerHTML = tokens.length ? prettyHTML(labelString()) : "0";
+}
+
+function pushToken(op, label) {
+  // los dígitos y el punto se van pegando al número que ya se estaba
+  // escribiendo, en vez de crear un token nuevo por cada tecla
+  const isDigit = /^[0-9.]$/.test(op);
+  const last = tokens[tokens.length - 1];
+  if (isDigit && last && last.type === "num") {
+    last.op += op; last.label += label ?? op;
+  } else {
+    tokens.push({ type: isDigit ? "num" : "op", op, label: label ?? op });
+  }
   render();
 }
 
 function evaluate() {
-  if (!expr) return;
+  if (!tokens.length) return;
   try {
-    // "^" es potencia: se traduce a ** antes de evaluar
-    const safe = expr.replace(/\^/g, "**");
-    // eslint-disable-next-line no-new-func
+    const safe = exprString().replace(/\^/g, "**");
     const result = Function("sin", "cos", "tan", "log", "ln", "sqrt", "pi", `"use strict"; return (${safe})`)(sin, cos, tan, log, ln, sqrt, pi);
     if (typeof result !== "number" || !isFinite(result)) throw new Error("resultado inválido");
     const rounded = Math.round(result * 1e10) / 1e10;
-    expr = String(rounded);
-    displayExpr = String(rounded);
+    tokens = [{ type: "num", op: String(rounded), label: String(rounded) }];
     render();
   } catch (err) {
     dispEl.textContent = "Error";
-    expr = "";
-    displayExpr = "";
+    tokens = [];
   }
 }
 
@@ -182,21 +201,31 @@ document.getElementById("calc-sci").addEventListener("click", (e) => {
     btn.textContent = deg ? "DEG" : "RAD";
     return;
   }
-  if (btn.dataset.action === "mem-add") { evaluate(); memory += parseFloat(expr) || 0; return; }
-  if (btn.dataset.action === "mem-recall") { append(String(memory)); return; }
+  if (btn.dataset.action === "mem-add") { evaluate(); memory += parseFloat(exprString()) || 0; return; }
+  if (btn.dataset.action === "mem-recall") { pushToken(String(memory)); return; }
   if (btn.dataset.action === "clear-mem") { memory = 0; return; }
-  if (btn.dataset.fn) { append(btn.dataset.fn); return; }
-  if (btn.dataset.op === "pi") { append("pi", "π"); return; }
-  if (btn.dataset.op) { append(btn.dataset.op); return; }
+  if (btn.dataset.fn) { pushToken(btn.dataset.fn, btn.textContent + "("); return; }
+  if (btn.dataset.op === "pi") { pushToken("pi", "π"); return; }
+  if (btn.dataset.op) { pushToken(btn.dataset.op, btn.textContent); return; }
 });
 
 document.getElementById("calc-basic").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
-  if (btn.dataset.action === "clear") { expr = ""; displayExpr = ""; render(); return; }
-  if (btn.dataset.action === "back") { expr = expr.slice(0, -1); displayExpr = displayExpr.slice(0, -1); render(); return; }
+  if (btn.dataset.action === "clear") { tokens = []; render(); return; }
+  if (btn.dataset.action === "back") {
+    const last = tokens[tokens.length - 1];
+    if (last && last.type === "num" && last.op.length > 1) {
+      last.op = last.op.slice(0, -1);
+      last.label = last.label.slice(0, -1);
+    } else {
+      tokens.pop();
+    }
+    render();
+    return;
+  }
   if (btn.dataset.action === "equals") { evaluate(); return; }
-  if (btn.dataset.op) { append(btn.dataset.op); return; }
+  if (btn.dataset.op) { pushToken(btn.dataset.op, btn.textContent); return; }
 });
 
 // ---------- Operaciones frecuentes (guardadas en este dispositivo) ----------
@@ -214,7 +243,7 @@ function renderFrequent() {
     const chip = document.createElement("div");
     chip.className = "calc-chip";
     chip.innerHTML = `<span>${op.name}</span><button data-i="${i}" title="Eliminar">✕</button>`;
-    chip.querySelector("span").addEventListener("click", () => { append(op.expr, op.name); });
+    chip.querySelector("span").addEventListener("click", () => { pushToken(op.expr, op.name); });
     chip.querySelector("button").addEventListener("click", (e) => {
       e.stopPropagation();
       const l = getFrequent(); l.splice(i, 1); saveFrequent(l); renderFrequent();
@@ -225,10 +254,10 @@ function renderFrequent() {
 
 document.getElementById("calc-save-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  if (!expr) return;
+  if (!tokens.length) return;
   const nameEl = document.getElementById("calc-save-name");
   const list = getFrequent();
-  list.push({ name: nameEl.value.trim(), expr });
+  list.push({ name: nameEl.value.trim(), expr: exprString() });
   saveFrequent(list);
   nameEl.value = "";
   renderFrequent();

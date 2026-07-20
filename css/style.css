@@ -231,6 +231,30 @@ tr.date-sep td {
 .empty-state { text-align: center; padding: var(--space-5) 0; color: var(--text-muted); }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .74rem; background: var(--bg-panel-alt); color: var(--text-muted); }
 
+/* ---------- Calculadora ---------- */
+.calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: var(--space-3); }
+.calc-grid button {
+  padding: 14px 4px;
+  border-radius: var(--radius);
+  border: var(--border-width) solid var(--border-color);
+  background: var(--bg-panel-alt);
+  color: var(--text-primary);
+  font-size: .95rem;
+  cursor: pointer;
+}
+.calc-grid button:active { box-shadow: inset 0 0 0 1px var(--accent-income); }
+.calc-grid button.calc-eq { background: var(--accent-income); color: #04231a; font-weight: 600; }
+.calc-grid button.active-toggle { box-shadow: inset 0 0 0 1px var(--accent-income); color: var(--accent-income); }
+.calc-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 20px;
+  background: var(--bg-panel-alt); border: var(--border-width) solid var(--border-color);
+  font-size: .82rem; cursor: pointer;
+}
+.calc-chip button {
+  background: none; border: none; color: var(--accent-danger); cursor: pointer; font-size: .8rem; padding: 0;
+}
+
 .color-palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-bottom: var(--space-3); }
 .color-swatch {
   width: 100%; aspect-ratio: 1;

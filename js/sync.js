@@ -143,5 +143,24 @@ const Sync = (() => {
     checking = false;
   }
 
-  return { setLed, markDirty, updateLed, doSync, pullAll, checkRemoteChanges };
+  // ---------- Cuándo revisar ----------
+  // 1) Al volver a esta pestaña/app (lo más importante: cubre "edito en el
+  //    celular, regreso a la compu" casi al instante).
+  // 2) Un sondeo ligero de respaldo cada 15s mientras la pestaña esté
+  //    visible, por si te quedas viendo la misma pantalla sin cambiar de
+  //    foco. Se pausa solo si la pestaña está en segundo plano.
+  let watching = false;
+  function startWatching() {
+    if (watching) return;
+    watching = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") checkRemoteChanges();
+    });
+    window.addEventListener("focus", checkRemoteChanges);
+    setInterval(() => {
+      if (document.visibilityState === "visible") checkRemoteChanges();
+    }, 15000);
+  }
+
+  return { setLed, markDirty, updateLed, doSync, pullAll, checkRemoteChanges, startWatching };
 })();

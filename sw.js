@@ -12,7 +12,7 @@
    (con scripts desactualizados) si alguna vez una descarga
    falló a medias.
    ============================================ */
-const CACHE = "libro-v2";
+const CACHE = "libro-v3";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
@@ -43,10 +43,14 @@ self.addEventListener("fetch", (e) => {
   }
 
   // Páginas HTML (navegación): SIEMPRE red si hay internet. Solo se usa
-  // la copia en caché cuando de verdad no hay conexión.
+  // la copia en caché cuando de verdad no hay conexión. cache:"reload"
+  // evita que el propio caché HTTP del navegador (una capa aparte de la
+  // de este service worker) devuelva una copia vieja sin siquiera pedirla
+  // a internet — que fue justo lo que causó que un CSS actualizado no se
+  // reflejara.
   if (e.request.mode === "navigate") {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request, { cache: "reload" })
         .then((res) => {
           caches.open(CACHE).then((cache) => cache.put(e.request, res.clone()));
           return res;
@@ -57,11 +61,12 @@ self.addEventListener("fetch", (e) => {
   }
 
   // Otros archivos propios de la app (JS/CSS/íconos): red primero (para
-  // recibir actualizaciones), con la copia en caché como respaldo
-  // instantáneo / modo sin conexión
+  // recibir actualizaciones), ignorando también el caché HTTP del
+  // navegador, con la copia en caché como respaldo instantáneo / modo
+  // sin conexión.
   if (url.origin === location.origin) {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request, { cache: "reload" })
         .then((res) => {
           caches.open(CACHE).then((cache) => cache.put(e.request, res.clone()));
           return res;

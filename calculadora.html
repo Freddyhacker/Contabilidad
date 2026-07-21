@@ -148,8 +148,8 @@
 //    desincroniza lo que ves de lo que se calcula, y Borrar quita un
 //    símbolo completo a la vez, no un carácter suelto.
 let tokens = [];
-let editIndex = null;  // índice del token que se está reescribiendo (null = se escribe al final, normal)
-let editFresh = false; // true justo después de tocar un número: el próximo dígito lo reemplaza en vez de pegarse
+let editIndex = null; // índice del token que se está corrigiendo (null = modo normal)
+let editPos = null;   // posición EXACTA del dígito dentro de ese número que se va a reemplazar
 let deg = true; // grados por defecto (más intuitivo que radianes)
 let memory = 0;
 
@@ -166,17 +166,19 @@ const pi = Math.PI;
 
 function exprString() { return tokens.map(t => t.op).join(""); }
 
-// Un solo display: recorre los tokens y arma el HTML directamente (no un
-// texto plano que luego se re-interpreta), así cada número que se ve en
-// pantalla —incluso adentro de una fracción o un exponente— sabe a qué
-// posición del arreglo corresponde y se puede tocar para editarlo, en
-// cualquier momento, incluso a medio escribir.
+// Un solo display: recorre los tokens y arma el HTML directamente. Los
+// números se dibujan DÍGITO POR DÍGITO, cada uno con su propio "data-pos",
+// así se puede tocar exactamente el dígito equivocado (incluso adentro de
+// una fracción o un exponente) y corregir solo ese, sin borrar el resto.
 function tokEl(i) {
   const t = tokens[i];
-  const cls = ["calc-tok-inline"];
-  if (t.type === "num") cls.push("editable");
-  if (i === editIndex) cls.push("editing");
-  return `<span class="${cls.join(" ")}" data-i="${i}">${t.label}</span>`;
+  if (t.type === "num") {
+    return t.label.split("").map((ch, pos) => {
+      const editing = i === editIndex && pos === editPos;
+      return `<span class="calc-digit${editing ? ' editing' : ''}" data-i="${i}" data-pos="${pos}">${ch}</span>`;
+    }).join("");
+  }
+  return `<span class="calc-tok-inline" data-i="${i}">${t.label}</span>`;
 }
 
 function renderHTML() {
@@ -205,10 +207,10 @@ function renderHTML() {
 function render() {
   dispEl.innerHTML = renderHTML();
   dispEl.scrollLeft = dispEl.scrollWidth;
-  dispEl.querySelectorAll(".editable").forEach(el => {
+  dispEl.querySelectorAll(".calc-digit").forEach(el => {
     el.addEventListener("click", () => {
       editIndex = parseInt(el.dataset.i);
-      editFresh = true;
+      editPos = parseInt(el.dataset.pos);
       render();
     });
   });
@@ -217,17 +219,22 @@ function render() {
 function pushToken(op, label) {
   const isDigit = /^[0-9.]$/.test(op);
 
-  // Si hay un número seleccionado para editar, los dígitos van ahí en
-  // vez de al final. El primer dígito reemplaza el valor viejo.
-  if (editIndex !== null) {
+  // Si hay un dígito exacto seleccionado para corregir, se reemplaza SOLO
+  // ese carácter dentro del número — el resto del número queda intacto.
+  if (editIndex !== null && editPos !== null) {
     const t = tokens[editIndex];
     if (isDigit && t && t.type === "num") {
-      if (editFresh) { t.op = ""; t.label = ""; editFresh = false; }
-      t.op += op; t.label += label ?? op;
+      const opChars = t.op.split("");
+      const labelChars = t.label.split("");
+      opChars[editPos] = op;
+      labelChars[editPos] = label ?? op;
+      t.op = opChars.join("");
+      t.label = labelChars.join("");
+      editIndex = null; editPos = null;
       render();
       return;
     }
-    editIndex = null; // cualquier otro botón cierra la edición y sigue normal
+    editIndex = null; editPos = null; // cualquier otro botón cancela la corrección y sigue normal
   }
 
   const last = tokens[tokens.length - 1];
@@ -241,7 +248,7 @@ function pushToken(op, label) {
 
 function evaluate() {
   if (!tokens.length) return;
-  editIndex = null;
+  editIndex = null; editPos = null;
   try {
     const safe = exprString().replace(/\^/g, "**");
     const result = Function("sin", "cos", "tan", "log", "ln", "sqrt", "pi", `"use strict"; return (${safe})`)(sin, cos, tan, log, ln, sqrt, pi);
@@ -281,19 +288,26 @@ document.getElementById("calc-sci").addEventListener("click", (e) => {
 document.getElementById("calc-basic").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
-  if (btn.dataset.action === "clear") { tokens = []; editIndex = null; render(); return; }
+  if (btn.dataset.action === "clear") { tokens = []; editIndex = null; editPos = null; render(); return; }
   if (btn.dataset.action === "back") {
-    const i = editIndex !== null ? editIndex : tokens.length - 1;
-    const last = tokens[i];
+    if (editIndex !== null && editPos !== null) {
+      const t = tokens[editIndex];
+      const opChars = t.op.split("");
+      const labelChars = t.label.split("");
+      opChars.splice(editPos, 1);
+      labelChars.splice(editPos, 1);
+      if (opChars.length === 0) tokens.splice(editIndex, 1);
+      else { t.op = opChars.join(""); t.label = labelChars.join(""); }
+      editIndex = null; editPos = null;
+      render();
+      return;
+    }
+    const last = tokens[tokens.length - 1];
     if (last && last.type === "num" && last.op.length > 1) {
       last.op = last.op.slice(0, -1);
       last.label = last.label.slice(0, -1);
-    } else if (i === tokens.length - 1) {
+    } else {
       tokens.pop();
-      if (editIndex !== null) editIndex = null;
-    } else if (last) {
-      tokens.splice(i, 1);
-      editIndex = null;
     }
     render();
     return;
@@ -328,7 +342,7 @@ function renderFrequent() {
       // lado), para poder editar cualquiera de ellos después, no como un
       // solo bloque fijo
       op.tokens.forEach(t => tokens.push({ ...t }));
-      editIndex = null;
+      editIndex = null; editPos = null;
       render();
       document.getElementById("calc-list-modal").style.display = "none";
     });

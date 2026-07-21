@@ -54,9 +54,7 @@
 
     <div class="card calc-card" style="position:relative">
       <div class="calc-wrap">
-      <div id="calc-expr" style="height:18px;color:var(--text-muted);font-size:.85rem;text-align:right;white-space:nowrap;overflow-x:auto;overflow-y:hidden"></div>
       <div id="calc-display" class="figure" style="text-align:right;font-size:2.1rem;margin:6px 0 var(--space-3);white-space:nowrap;overflow-x:auto;overflow-y:hidden">0</div>
-      <div id="calc-tokens" class="calc-tokens"></div>
 
       <div class="calc-grid" id="calc-sci">
         <button data-op="deg">DEG</button>
@@ -155,9 +153,7 @@ let editFresh = false; // true justo después de tocar un número: el próximo d
 let deg = true; // grados por defecto (más intuitivo que radianes)
 let memory = 0;
 
-const exprEl = document.getElementById("calc-expr");
 const dispEl = document.getElementById("calc-display");
-const tokensEl = document.getElementById("calc-tokens");
 
 function toRad(x) { return deg ? x * Math.PI / 180 : x; }
 const sin = x => Math.sin(toRad(x));
@@ -168,33 +164,48 @@ const ln = x => Math.log(x);
 const sqrt = x => Math.sqrt(x);
 const pi = Math.PI;
 
-function tokensToLabel(toks) { return toks.map(t => t.label).join(""); }
 function exprString() { return tokens.map(t => t.op).join(""); }
-function labelString() { return tokensToLabel(tokens); }
 
-// Convierte "12÷5" en una fracción de dos pisos, y "2^3" en un exponente
-// elevado — así se ve "multinivel" en vez de puro texto en línea.
-function prettyHTML(s) {
-  let html = s
-    .replace(/(\d+\.?\d*)÷(\d+\.?\d*)/g, '<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>')
-    .replace(/(\d+\.?\d*)÷(?!\d)/g, '<span class="frac"><span class="num">$1</span><span class="den">&nbsp;</span></span>')
-    .replace(/(\d+\.?\d*)\^(\d+\.?\d*)/g, '$1<sup>$2</sup>');
+// Un solo display: recorre los tokens y arma el HTML directamente (no un
+// texto plano que luego se re-interpreta), así cada número que se ve en
+// pantalla —incluso adentro de una fracción o un exponente— sabe a qué
+// posición del arreglo corresponde y se puede tocar para editarlo, en
+// cualquier momento, incluso a medio escribir.
+function tokEl(i) {
+  const t = tokens[i];
+  const cls = ["calc-tok-inline"];
+  if (t.type === "num") cls.push("editable");
+  if (i === editIndex) cls.push("editing");
+  return `<span class="${cls.join(" ")}" data-i="${i}">${t.label}</span>`;
+}
+
+function renderHTML() {
+  let html = "";
+  let i = 0;
+  while (i < tokens.length) {
+    const a = tokens[i], b = tokens[i + 1], c = tokens[i + 2];
+    if (a.type === "num" && b && b.op === "/" && c && c.type === "num") {
+      html += `<span class="frac"><span class="num">${tokEl(i)}</span><span class="den">${tokEl(i + 2)}</span></span>`;
+      i += 3; continue;
+    }
+    if (a.type === "num" && b && b.op === "/" && !c) {
+      html += `<span class="frac"><span class="num">${tokEl(i)}</span><span class="den">&nbsp;</span></span>`;
+      i += 2; continue;
+    }
+    if (a.type === "num" && b && b.op === "^" && c && c.type === "num") {
+      html += `${tokEl(i)}<sup>${tokEl(i + 2)}</sup>`;
+      i += 3; continue;
+    }
+    html += tokEl(i);
+    i++;
+  }
   return html || "0";
 }
 
 function render() {
-  exprEl.textContent = labelString();
-  dispEl.innerHTML = tokens.length ? prettyHTML(labelString()) : "0";
-  exprEl.scrollLeft = exprEl.scrollWidth;
+  dispEl.innerHTML = renderHTML();
   dispEl.scrollLeft = dispEl.scrollWidth;
-
-  tokensEl.innerHTML = tokens.map((t, i) => {
-    const cls = ["calc-tok"];
-    if (t.type === "num") cls.push("editable");
-    if (i === editIndex) cls.push("editing");
-    return `<span class="${cls.join(" ")}" data-i="${i}">${t.label}</span>`;
-  }).join("");
-  tokensEl.querySelectorAll(".calc-tok.editable").forEach(el => {
+  dispEl.querySelectorAll(".editable").forEach(el => {
     el.addEventListener("click", () => {
       editIndex = parseInt(el.dataset.i);
       editFresh = true;

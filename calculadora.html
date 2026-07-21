@@ -56,6 +56,7 @@
       <div class="calc-wrap">
       <div id="calc-expr" style="height:18px;color:var(--text-muted);font-size:.85rem;text-align:right;white-space:nowrap;overflow-x:auto;overflow-y:hidden"></div>
       <div id="calc-display" class="figure" style="text-align:right;font-size:2.1rem;margin:6px 0 var(--space-3);white-space:nowrap;overflow-x:auto;overflow-y:hidden">0</div>
+      <div id="calc-tokens" class="calc-tokens"></div>
 
       <div class="calc-grid" id="calc-sci">
         <button data-op="deg">DEG</button>
@@ -149,11 +150,14 @@
 //    desincroniza lo que ves de lo que se calcula, y Borrar quita un
 //    símbolo completo a la vez, no un carácter suelto.
 let tokens = [];
+let editIndex = null;  // índice del token que se está reescribiendo (null = se escribe al final, normal)
+let editFresh = false; // true justo después de tocar un número: el próximo dígito lo reemplaza en vez de pegarse
 let deg = true; // grados por defecto (más intuitivo que radianes)
 let memory = 0;
 
 const exprEl = document.getElementById("calc-expr");
 const dispEl = document.getElementById("calc-display");
+const tokensEl = document.getElementById("calc-tokens");
 
 function toRad(x) { return deg ? x * Math.PI / 180 : x; }
 const sin = x => Math.sin(toRad(x));
@@ -183,12 +187,38 @@ function render() {
   dispEl.innerHTML = tokens.length ? prettyHTML(labelString()) : "0";
   exprEl.scrollLeft = exprEl.scrollWidth;
   dispEl.scrollLeft = dispEl.scrollWidth;
+
+  tokensEl.innerHTML = tokens.map((t, i) => {
+    const cls = ["calc-tok"];
+    if (t.type === "num") cls.push("editable");
+    if (i === editIndex) cls.push("editing");
+    return `<span class="${cls.join(" ")}" data-i="${i}">${t.label}</span>`;
+  }).join("");
+  tokensEl.querySelectorAll(".calc-tok.editable").forEach(el => {
+    el.addEventListener("click", () => {
+      editIndex = parseInt(el.dataset.i);
+      editFresh = true;
+      render();
+    });
+  });
 }
 
 function pushToken(op, label) {
-  // los dígitos y el punto se van pegando al número que ya se estaba
-  // escribiendo, en vez de crear un token nuevo por cada tecla
   const isDigit = /^[0-9.]$/.test(op);
+
+  // Si hay un número seleccionado para editar, los dígitos van ahí en
+  // vez de al final. El primer dígito reemplaza el valor viejo.
+  if (editIndex !== null) {
+    const t = tokens[editIndex];
+    if (isDigit && t && t.type === "num") {
+      if (editFresh) { t.op = ""; t.label = ""; editFresh = false; }
+      t.op += op; t.label += label ?? op;
+      render();
+      return;
+    }
+    editIndex = null; // cualquier otro botón cierra la edición y sigue normal
+  }
+
   const last = tokens[tokens.length - 1];
   if (isDigit && last && last.type === "num") {
     last.op += op; last.label += label ?? op;
@@ -200,6 +230,7 @@ function pushToken(op, label) {
 
 function evaluate() {
   if (!tokens.length) return;
+  editIndex = null;
   try {
     const safe = exprString().replace(/\^/g, "**");
     const result = Function("sin", "cos", "tan", "log", "ln", "sqrt", "pi", `"use strict"; return (${safe})`)(sin, cos, tan, log, ln, sqrt, pi);
@@ -239,14 +270,19 @@ document.getElementById("calc-sci").addEventListener("click", (e) => {
 document.getElementById("calc-basic").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
-  if (btn.dataset.action === "clear") { tokens = []; render(); return; }
+  if (btn.dataset.action === "clear") { tokens = []; editIndex = null; render(); return; }
   if (btn.dataset.action === "back") {
-    const last = tokens[tokens.length - 1];
+    const i = editIndex !== null ? editIndex : tokens.length - 1;
+    const last = tokens[i];
     if (last && last.type === "num" && last.op.length > 1) {
       last.op = last.op.slice(0, -1);
       last.label = last.label.slice(0, -1);
-    } else {
+    } else if (i === tokens.length - 1) {
       tokens.pop();
+      if (editIndex !== null) editIndex = null;
+    } else if (last) {
+      tokens.splice(i, 1);
+      editIndex = null;
     }
     render();
     return;
@@ -275,12 +311,13 @@ function renderFrequent() {
     if (!op.tokens && op.expr) op.tokens = [{ type: "op", op: op.expr, label: op.name }]; // formato viejo
     const chip = document.createElement("div");
     chip.className = "calc-freq-chip";
-    chip.innerHTML = `<span>${op.name} <span style="color:var(--text-muted);font-size:.78rem">(${tokensToLabel(op.tokens)})</span></span><button data-i="${i}" title="Eliminar">✕</button>`;
+    chip.innerHTML = `<span>${op.name}</span><button data-i="${i}" title="Eliminar">✕</button>`;
     chip.querySelector("span").addEventListener("click", () => {
       // se insertan los tokens TAL CUAL se guardaron (cada número por su
       // lado), para poder editar cualquiera de ellos después, no como un
       // solo bloque fijo
       op.tokens.forEach(t => tokens.push({ ...t }));
+      editIndex = null;
       render();
       document.getElementById("calc-list-modal").style.display = "none";
     });

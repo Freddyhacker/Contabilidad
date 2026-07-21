@@ -237,11 +237,11 @@ tr.date-sep td {
 @media (min-width: 800px) {
   .calc-wrap { max-width: 520px; }
   .calc-grid button { padding: 20px 6px; font-size: 1.1rem; }
-  #calc-display { font-size: 2.6rem; }
+  #calc-display { font-size: 2.6rem; height: 6.2rem; }
 }
-.calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: var(--space-3); }
+.calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: var(--space-3); }
 .calc-grid button {
-  padding: 14px 4px;
+  padding: 18px 4px;
   border-radius: var(--radius);
   border: var(--border-width) solid var(--border-color);
   background: var(--bg-panel-alt);

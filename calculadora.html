@@ -52,9 +52,10 @@
   <main class="main">
     <div class="topbar"><div><h1>Calculadora</h1><div class="sub">Científica, con tus operaciones frecuentes a la mano</div></div></div>
 
-    <div class="card" style="max-width:420px">
-      <div id="calc-expr" style="min-height:20px;color:var(--text-muted);font-size:.85rem;text-align:right;overflow-wrap:break-word"></div>
-      <div id="calc-display" class="figure" style="text-align:right;font-size:2.1rem;margin:6px 0 var(--space-3);overflow-wrap:break-word">0</div>
+    <div class="card calc-card" style="position:relative">
+      <div class="calc-wrap">
+      <div id="calc-expr" style="height:18px;color:var(--text-muted);font-size:.85rem;text-align:right;white-space:nowrap;overflow-x:auto;overflow-y:hidden"></div>
+      <div id="calc-display" class="figure" style="text-align:right;font-size:2.1rem;margin:6px 0 var(--space-3);white-space:nowrap;overflow-x:auto;overflow-y:hidden">0</div>
 
       <div class="calc-grid" id="calc-sci">
         <button data-op="deg">DEG</button>
@@ -74,6 +75,8 @@
         <button data-op="pi">π</button>
         <button data-op="%">%</button>
         <button data-action="mem-add">M+</button>
+
+        <button data-action="open-save">Guardar</button>
       </div>
 
       <div class="calc-grid" id="calc-basic">
@@ -95,21 +98,36 @@
         <button data-op="1">1</button>
         <button data-op="2">2</button>
         <button data-op="3">3</button>
-        <button data-action="equals" class="calc-eq" style="grid-row: span 2">=</button>
+        <button data-action="equals" class="calc-eq">=</button>
 
         <button data-op="0" style="grid-column:span 2">0</button>
         <button data-op=".">.</button>
+        <button data-action="open-list">☰ Frecuentes</button>
       </div>
-    </div>
+      </div>
 
-    <div class="card" style="max-width:420px">
-      <h3>Frecuentes</h3>
-      <div class="sub" style="margin-bottom:var(--space-3)">Guarda una operación (ej. "* 1.16" para IVA) y úsala con un toque</div>
-      <div id="calc-frequent" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:var(--space-3)"></div>
-      <form id="calc-save-form" style="display:flex;gap:8px">
-        <input id="calc-save-name" placeholder="Nombre (ej. IVA)" style="margin:0" required>
-        <button class="btn" type="submit" style="flex-shrink:0">Guardar actual</button>
-      </form>
+      <!-- Ventanita para guardar la operación actual -->
+      <div id="calc-save-modal" class="calc-modal" style="display:none">
+        <div class="calc-modal-box">
+          <h3 style="margin-bottom:var(--space-3)">Guardar operación</h3>
+          <form id="calc-save-form">
+            <input id="calc-save-name" placeholder="Nombre (ej. IVA)" required>
+            <div style="display:flex;gap:8px;margin-top:var(--space-2)">
+              <button class="btn" type="submit" style="flex:1">Guardar</button>
+              <button class="btn btn-secondary" type="button" id="calc-save-cancel" style="flex:1">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Ventanita con la lista de operaciones guardadas -->
+      <div id="calc-list-modal" class="calc-modal" style="display:none">
+        <div class="calc-modal-box">
+          <h3 style="margin-bottom:var(--space-3)">Frecuentes</h3>
+          <div id="calc-frequent"></div>
+          <button class="btn btn-secondary btn-block" type="button" id="calc-list-close" style="margin-top:var(--space-3)">Cerrar</button>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -146,8 +164,9 @@ const ln = x => Math.log(x);
 const sqrt = x => Math.sqrt(x);
 const pi = Math.PI;
 
+function tokensToLabel(toks) { return toks.map(t => t.label).join(""); }
 function exprString() { return tokens.map(t => t.op).join(""); }
-function labelString() { return tokens.map(t => t.label).join(""); }
+function labelString() { return tokensToLabel(tokens); }
 
 // Convierte "12÷5" en una fracción de dos pisos, y "2^3" en un exponente
 // elevado — así se ve "multinivel" en vez de puro texto en línea.
@@ -162,6 +181,8 @@ function prettyHTML(s) {
 function render() {
   exprEl.textContent = labelString();
   dispEl.innerHTML = tokens.length ? prettyHTML(labelString()) : "0";
+  exprEl.scrollLeft = exprEl.scrollWidth;
+  dispEl.scrollLeft = dispEl.scrollWidth;
 }
 
 function pushToken(op, label) {
@@ -204,6 +225,12 @@ document.getElementById("calc-sci").addEventListener("click", (e) => {
   if (btn.dataset.action === "mem-add") { evaluate(); memory += parseFloat(exprString()) || 0; return; }
   if (btn.dataset.action === "mem-recall") { pushToken(String(memory)); return; }
   if (btn.dataset.action === "clear-mem") { memory = 0; return; }
+  if (btn.dataset.action === "open-save") {
+    if (!tokens.length) return;
+    document.getElementById("calc-save-modal").style.display = "flex";
+    document.getElementById("calc-save-name").focus();
+    return;
+  }
   if (btn.dataset.fn) { pushToken(btn.dataset.fn, btn.textContent + "("); return; }
   if (btn.dataset.op === "pi") { pushToken("pi", "π"); return; }
   if (btn.dataset.op) { pushToken(btn.dataset.op, btn.textContent); return; }
@@ -225,6 +252,11 @@ document.getElementById("calc-basic").addEventListener("click", (e) => {
     return;
   }
   if (btn.dataset.action === "equals") { evaluate(); return; }
+  if (btn.dataset.action === "open-list") {
+    renderFrequent();
+    document.getElementById("calc-list-modal").style.display = "flex";
+    return;
+  }
   if (btn.dataset.op) { pushToken(btn.dataset.op, btn.textContent); return; }
 });
 
@@ -240,10 +272,18 @@ function renderFrequent() {
   const wrap = document.getElementById("calc-frequent");
   wrap.innerHTML = list.length ? "" : '<span style="color:var(--text-muted);font-size:.82rem">Aún no guardas ninguna</span>';
   list.forEach((op, i) => {
+    if (!op.tokens && op.expr) op.tokens = [{ type: "op", op: op.expr, label: op.name }]; // formato viejo
     const chip = document.createElement("div");
-    chip.className = "calc-chip";
-    chip.innerHTML = `<span>${op.name}</span><button data-i="${i}" title="Eliminar">✕</button>`;
-    chip.querySelector("span").addEventListener("click", () => { pushToken(op.expr, op.name); });
+    chip.className = "calc-freq-chip";
+    chip.innerHTML = `<span>${op.name} <span style="color:var(--text-muted);font-size:.78rem">(${tokensToLabel(op.tokens)})</span></span><button data-i="${i}" title="Eliminar">✕</button>`;
+    chip.querySelector("span").addEventListener("click", () => {
+      // se insertan los tokens TAL CUAL se guardaron (cada número por su
+      // lado), para poder editar cualquiera de ellos después, no como un
+      // solo bloque fijo
+      op.tokens.forEach(t => tokens.push({ ...t }));
+      render();
+      document.getElementById("calc-list-modal").style.display = "none";
+    });
     chip.querySelector("button").addEventListener("click", (e) => {
       e.stopPropagation();
       const l = getFrequent(); l.splice(i, 1); saveFrequent(l); renderFrequent();
@@ -257,17 +297,22 @@ document.getElementById("calc-save-form").addEventListener("submit", (e) => {
   if (!tokens.length) return;
   const nameEl = document.getElementById("calc-save-name");
   const list = getFrequent();
-  list.push({ name: nameEl.value.trim(), expr: exprString() });
+  list.push({ name: nameEl.value.trim(), tokens: tokens.map(t => ({ ...t })) });
   saveFrequent(list);
   nameEl.value = "";
-  renderFrequent();
+  document.getElementById("calc-save-modal").style.display = "none";
+});
+document.getElementById("calc-save-cancel").addEventListener("click", () => {
+  document.getElementById("calc-save-modal").style.display = "none";
+});
+document.getElementById("calc-list-close").addEventListener("click", () => {
+  document.getElementById("calc-list-modal").style.display = "none";
 });
 
 (async () => {
   const session = await guardPage();
   if (!session) return;
   render();
-  renderFrequent();
 })();
 </script>
 </body>

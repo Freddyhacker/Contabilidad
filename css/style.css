@@ -281,13 +281,8 @@ tr.date-sep td {
   background: var(--bg-panel); border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius); padding: var(--space-4); width: 90%; max-width: 320px;
 }
-.calc-tokens { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: var(--space-3); min-height: 26px; }
-.calc-tok {
-  padding: 4px 8px; border-radius: 6px; font-size: .82rem; font-family: var(--font-mono);
-  background: var(--bg-panel-alt); border: var(--border-width) solid var(--border-color); color: var(--text-primary);
-}
-.calc-tok.editable { cursor: pointer; }
-.calc-tok.editing { box-shadow: inset 0 0 0 1px var(--accent-income); color: var(--accent-income); }
+.calc-tok-inline.editable { cursor: pointer; border-radius: 4px; }
+.calc-tok-inline.editing { box-shadow: inset 0 0 0 1.5px var(--accent-income); color: var(--accent-income); }
 
 .calc-freq-chip {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;

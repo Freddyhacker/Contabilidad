@@ -232,6 +232,13 @@ tr.date-sep td {
 .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .74rem; background: var(--bg-panel-alt); color: var(--text-muted); }
 
 /* ---------- Calculadora ---------- */
+.calc-card { display: flex; justify-content: center; }
+.calc-wrap { width: 100%; max-width: 420px; }
+@media (min-width: 800px) {
+  .calc-wrap { max-width: 520px; }
+  .calc-grid button { padding: 20px 6px; font-size: 1.1rem; }
+  #calc-display { font-size: 2.6rem; }
+}
 .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: var(--space-3); }
 .calc-grid button {
   padding: 14px 4px;
@@ -263,6 +270,26 @@ tr.date-sep td {
 #calc-display .frac .num { padding: 0 4px 3px; border-bottom: 2px solid currentColor; }
 #calc-display .frac .den { padding: 3px 4px 0; }
 #calc-display sup { font-size: .6em; vertical-align: super; }
+
+.calc-modal {
+  position: absolute; inset: 0; z-index: 60;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius);
+}
+.calc-modal-box {
+  background: var(--bg-panel); border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius); padding: var(--space-4); width: 90%; max-width: 320px;
+}
+.calc-freq-chip {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border-radius: var(--radius);
+  background: var(--bg-panel-alt); border: var(--border-width) solid var(--border-color);
+  margin-bottom: 8px; cursor: pointer;
+}
+.calc-freq-chip button {
+  background: none; border: none; color: var(--accent-danger); cursor: pointer; font-size: .85rem; padding: 0;
+}
 
 .color-palette { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-bottom: var(--space-3); }
 .color-swatch {

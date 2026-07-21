@@ -56,52 +56,54 @@
       <div class="calc-wrap">
       <div id="calc-display" class="figure" style="height:5.2rem;display:flex;align-items:flex-end;justify-content:flex-end;font-size:2.1rem;margin:6px 0 var(--space-3);white-space:nowrap;overflow-x:auto;overflow-y:hidden">0</div>
 
-      <div class="calc-grid" id="calc-sci">
-        <button data-op="deg">DEG</button>
-        <button data-fn="sin(">sin</button>
-        <button data-fn="cos(">cos</button>
-        <button data-fn="tan(">tan</button>
-        <button data-action="clear-mem">MC</button>
+      <div class="calc-cols">
+        <div class="calc-grid" id="calc-sci">
+          <button data-op="deg">DEG</button>
+          <button data-fn="sin(">sin</button>
+          <button data-fn="cos(">cos</button>
+          <button data-fn="tan(">tan</button>
+          <button data-action="clear-mem">MC</button>
 
-        <button data-fn="log(">log</button>
-        <button data-fn="ln(">ln</button>
-        <button data-fn="sqrt(">√</button>
-        <button data-op="^">x^y</button>
-        <button data-action="mem-recall">MR</button>
+          <button data-fn="log(">log</button>
+          <button data-fn="ln(">ln</button>
+          <button data-fn="sqrt(">√</button>
+          <button data-op="^">x^y</button>
+          <button data-action="mem-recall">MR</button>
 
-        <button data-op="(">(</button>
-        <button data-op=")">)</button>
-        <button data-op="pi">π</button>
-        <button data-op="%">%</button>
-        <button data-action="mem-add">M+</button>
+          <button data-op="(" id="calc-open-paren">(</button>
+          <button data-op=")" id="calc-close-paren">)</button>
+          <button data-op="pi">π</button>
+          <button data-op="%">%</button>
+          <button data-action="mem-add">M+</button>
 
-        <button data-action="open-save">Guardar</button>
-      </div>
+          <button data-action="open-save">Guardar</button>
+        </div>
 
-      <div class="calc-grid" id="calc-basic">
-        <button data-action="clear">C</button>
-        <button data-action="back">⌫</button>
-        <button data-op="/">÷</button>
-        <button data-op="*">×</button>
+        <div class="calc-grid" id="calc-basic">
+          <button data-action="clear">C</button>
+          <button data-action="back">⌫</button>
+          <button data-op="/">÷</button>
+          <button data-op="*">×</button>
 
-        <button data-op="7">7</button>
-        <button data-op="8">8</button>
-        <button data-op="9">9</button>
-        <button data-op="-">−</button>
+          <button data-op="7">7</button>
+          <button data-op="8">8</button>
+          <button data-op="9">9</button>
+          <button data-op="-">−</button>
 
-        <button data-op="4">4</button>
-        <button data-op="5">5</button>
-        <button data-op="6">6</button>
-        <button data-op="+">+</button>
+          <button data-op="4">4</button>
+          <button data-op="5">5</button>
+          <button data-op="6">6</button>
+          <button data-op="+">+</button>
 
-        <button data-op="1">1</button>
-        <button data-op="2">2</button>
-        <button data-op="3">3</button>
-        <button data-action="equals" class="calc-eq">=</button>
+          <button data-op="1">1</button>
+          <button data-op="2">2</button>
+          <button data-op="3">3</button>
+          <button data-action="equals" class="calc-eq" style="grid-row: span 2">=</button>
 
-        <button data-op="0">0</button>
-        <button data-op=".">.</button>
-        <button data-action="open-list">☰ Frecuentes</button>
+          <button data-op="0">0</button>
+          <button data-op=".">.</button>
+          <button data-action="open-list">☰</button>
+        </div>
       </div>
       </div>
 
@@ -142,14 +144,15 @@
 <script src="js/sync.js"></script>
 <script src="js/nav.js"></script>
 <script>
-// Cada tecla presionada se guarda como un "token" con dos formas:
-//  - op: lo que se evalúa (ej. "sqrt(", "/", "^")
-//  - label: lo que se ve en pantalla (ej. "√(", "÷", "^") — así nunca se
-//    desincroniza lo que ves de lo que se calcula, y Borrar quita un
-//    símbolo completo a la vez, no un carácter suelto.
-let tokens = [];
-let editIndex = null; // índice del token que se está corrigiendo (null = modo normal)
-let editPos = null;   // posición EXACTA del dígito dentro de ese número que se va a reemplazar
+/* ============================================
+   Modelo de datos: "cells" — cada carácter que se puede insertar o
+   borrar en cualquier posición mediante un CURSOR de texto real (como en
+   un input normal), no un bloque fijo por número.
+   - dígitos/punto: una celda por carácter (editable de a uno)
+   - operadores/funciones/paréntesis/pi: una celda atómica (no se parte)
+   ============================================ */
+let cells = [];
+let cursor = 0; // posición del cursor (0..cells.length): dónde se inserta lo próximo que se escriba
 let deg = true; // grados por defecto (más intuitivo que radianes)
 let memory = 0;
 
@@ -164,107 +167,130 @@ const ln = x => Math.log(x);
 const sqrt = x => Math.sqrt(x);
 const pi = Math.PI;
 
-function exprString() { return tokens.map(t => t.op).join(""); }
+function isDigitChar(ch) { return /^[0-9.]$/.test(ch); }
 
-// Un solo display: recorre los tokens y arma el HTML directamente. Los
-// números se dibujan DÍGITO POR DÍGITO, cada uno con su propio "data-pos",
-// así se puede tocar exactamente el dígito equivocado (incluso adentro de
-// una fracción o un exponente) y corregir solo ese, sin borrar el resto.
-function tokEl(i) {
-  const t = tokens[i];
-  if (t.type === "num") {
-    return t.label.split("").map((ch, pos) => {
-      const editing = i === editIndex && pos === editPos;
-      return `<span class="calc-digit${editing ? ' editing' : ''}" data-i="${i}" data-pos="${pos}">${ch}</span>`;
-    }).join("");
+// El eval usa siempre paréntesis reales; [ ] { } son solo visuales para
+// que el usuario distinga niveles de jerarquía a simple vista.
+function exprString() {
+  return cells.map(c => c.op).join("").replace(/[\[{]/g, "(").replace(/[\]}]/g, ")");
+}
+
+function insertAtCursor(op, label) {
+  cells.splice(cursor, 0, { op, label, kind: isDigitChar(op) ? "digit" : "atom" });
+  cursor++;
+  render();
+}
+
+function backspaceAtCursor() {
+  if (cursor === 0) return;
+  cells.splice(cursor - 1, 1);
+  cursor--;
+  render();
+}
+
+function deleteForward() {
+  if (cursor >= cells.length) return;
+  cells.splice(cursor, 1);
+  render();
+}
+
+function moveCursor(delta) {
+  cursor = Math.max(0, Math.min(cells.length, cursor + delta));
+  render();
+}
+
+// Agrupa corridas de dígitos consecutivos en "números", para poder
+// detectar patrones número/número (fracción) y número^número (potencia)
+// igual que antes, pero ahora sobre el arreglo de celdas individuales.
+function groupCells() {
+  const groups = [];
+  let i = 0;
+  while (i < cells.length) {
+    if (cells[i].kind === "digit") {
+      const start = i;
+      while (i < cells.length && cells[i].kind === "digit") i++;
+      groups.push({ type: "num", start, end: i });
+    } else {
+      groups.push({ type: "atom", start: i, end: i + 1 });
+      i++;
+    }
   }
-  return `<span class="calc-tok-inline" data-i="${i}">${t.label}</span>`;
+  return groups;
+}
+
+// Dibuja los dígitos de start a end (excluyente), insertando el cursor
+// parpadeante en cualquier hueco donde caiga (antes, en medio o después).
+function renderDigits(start, end) {
+  let html = "";
+  for (let i = start; i <= end; i++) {
+    if (i === cursor) html += `<span class="calc-cursor"></span>`;
+    if (i < end) html += `<span class="calc-cell" data-i="${i}">${cells[i].label}</span>`;
+  }
+  return html;
+}
+
+function renderAtom(g) {
+  let html = "";
+  if (cursor === g.start) html += `<span class="calc-cursor"></span>`;
+  html += `<span class="calc-cell" data-i="${g.start}">${cells[g.start].label}</span>`;
+  return html;
 }
 
 function renderHTML() {
+  if (!cells.length) return `0<span class="calc-cursor"></span>`;
+  const groups = groupCells();
   let html = "";
-  let i = 0;
-  while (i < tokens.length) {
-    const a = tokens[i], b = tokens[i + 1], c = tokens[i + 2];
-    if (a.type === "num" && b && b.op === "/" && c && c.type === "num") {
-      html += `<span class="frac"><span class="num">${tokEl(i)}</span><span class="den">${tokEl(i + 2)}</span></span>`;
-      i += 3; continue;
+  let gi = 0;
+  while (gi < groups.length) {
+    const g = groups[gi], g1 = groups[gi + 1], g2 = groups[gi + 2];
+    if (g.type === "num" && g1 && g1.type === "atom" && cells[g1.start].op === "/" && g2 && g2.type === "num") {
+      html += `<span class="frac"><span class="num">${renderDigits(g.start, g.end)}</span><span class="den">${renderDigits(g2.start, g2.end)}</span></span>`;
+      gi += 3; continue;
     }
-    if (a.type === "num" && b && b.op === "/" && !c) {
-      html += `<span class="frac"><span class="num">${tokEl(i)}</span><span class="den">&nbsp;</span></span>`;
-      i += 2; continue;
+    if (g.type === "num" && g1 && g1.type === "atom" && cells[g1.start].op === "^" && g2 && g2.type === "num") {
+      html += `${renderDigits(g.start, g.end)}<sup>${renderDigits(g2.start, g2.end)}</sup>`;
+      gi += 3; continue;
     }
-    if (a.type === "num" && b && b.op === "^" && c && c.type === "num") {
-      html += `${tokEl(i)}<sup>${tokEl(i + 2)}</sup>`;
-      i += 3; continue;
-    }
-    html += tokEl(i);
-    i++;
+    if (g.type === "num") { html += renderDigits(g.start, g.end); gi++; continue; }
+    html += renderAtom(g);
+    gi++;
   }
-  return html || "0";
+  if (cursor === cells.length) html += `<span class="calc-cursor"></span>`;
+  return html;
 }
 
 function render() {
   dispEl.innerHTML = renderHTML();
   dispEl.scrollLeft = dispEl.scrollWidth;
-  dispEl.querySelectorAll(".calc-digit").forEach(el => {
-    el.addEventListener("click", () => {
-      editIndex = parseInt(el.dataset.i);
-      editPos = parseInt(el.dataset.pos);
-      render();
-    });
+  dispEl.querySelectorAll(".calc-cell").forEach(el => {
+    el.addEventListener("click", () => { cursor = parseInt(el.dataset.i) + 1; render(); });
   });
 }
-
-function pushToken(op, label) {
-  const isDigit = /^[0-9.]$/.test(op);
-
-  // Si hay un dígito exacto seleccionado para corregir, se reemplaza SOLO
-  // ese carácter dentro del número — el resto del número queda intacto.
-  if (editIndex !== null && editPos !== null) {
-    const t = tokens[editIndex];
-    if (isDigit && t && t.type === "num") {
-      const opChars = t.op.split("");
-      const labelChars = t.label.split("");
-      opChars[editPos] = op;
-      labelChars[editPos] = label ?? op;
-      t.op = opChars.join("");
-      t.label = labelChars.join("");
-      editIndex = null; editPos = null;
-      render();
-      return;
-    }
-    editIndex = null; editPos = null; // cualquier otro botón cancela la corrección y sigue normal
-  }
-
-  const last = tokens[tokens.length - 1];
-  if (isDigit && last && last.type === "num") {
-    last.op += op; last.label += label ?? op;
-  } else {
-    tokens.push({ type: isDigit ? "num" : "op", op, label: label ?? op });
-  }
-  render();
-}
+dispEl.addEventListener("click", (e) => {
+  if (e.target === dispEl) { cursor = cells.length; render(); }
+});
 
 function evaluate() {
-  if (!tokens.length) return;
-  editIndex = null; editPos = null;
+  if (!cells.length) return;
   try {
     const safe = exprString().replace(/\^/g, "**");
     const result = Function("sin", "cos", "tan", "log", "ln", "sqrt", "pi", `"use strict"; return (${safe})`)(sin, cos, tan, log, ln, sqrt, pi);
     if (typeof result !== "number" || !isFinite(result)) throw new Error("resultado inválido");
     const rounded = Math.round(result * 1e10) / 1e10;
-    tokens = [{ type: "num", op: String(rounded), label: String(rounded) }];
+    cells = String(rounded).split("").map(ch => ({ op: ch, label: ch, kind: isDigitChar(ch) ? "digit" : "atom" }));
+    cursor = cells.length;
     render();
   } catch (err) {
     dispEl.textContent = "Error";
-    tokens = [];
+    cells = []; cursor = 0;
   }
 }
 
+// ---------- Botones científicos ----------
 document.getElementById("calc-sci").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
+  if (btn.dataset.op === "(" || btn.dataset.op === ")") return; // tienen su propio manejo (mantener presionado = corchetes)
   if (btn.dataset.op === "deg") {
     deg = !deg;
     btn.classList.toggle("active-toggle", deg);
@@ -272,53 +298,88 @@ document.getElementById("calc-sci").addEventListener("click", (e) => {
     return;
   }
   if (btn.dataset.action === "mem-add") { evaluate(); memory += parseFloat(exprString()) || 0; return; }
-  if (btn.dataset.action === "mem-recall") { pushToken(String(memory)); return; }
+  if (btn.dataset.action === "mem-recall") { String(memory).split("").forEach(ch => insertAtCursor(ch, ch)); return; }
   if (btn.dataset.action === "clear-mem") { memory = 0; return; }
   if (btn.dataset.action === "open-save") {
-    if (!tokens.length) return;
+    if (!cells.length) return;
     document.getElementById("calc-save-modal").style.display = "flex";
     document.getElementById("calc-save-name").focus();
     return;
   }
-  if (btn.dataset.fn) { pushToken(btn.dataset.fn, btn.textContent + "("); return; }
-  if (btn.dataset.op === "pi") { pushToken("pi", "π"); return; }
-  if (btn.dataset.op) { pushToken(btn.dataset.op, btn.textContent); return; }
+  if (btn.dataset.fn) { insertAtCursor(btn.dataset.fn, btn.textContent + "("); return; }
+  if (btn.dataset.op === "pi") { insertAtCursor("pi", "π"); return; }
+  if (btn.dataset.op) { insertAtCursor(btn.dataset.op, btn.textContent); return; }
 });
 
+// Paréntesis: toque corto = "(" o ")"; mantener presionado = elegir [ ] o { }
+function setupBracketButton(id, defaultChar, options) {
+  const btn = document.getElementById(id);
+  let timer = null, longFired = false;
+  btn.addEventListener("pointerdown", () => {
+    longFired = false;
+    timer = setTimeout(() => { longFired = true; showBracketPicker(btn, options); }, 450);
+  });
+  btn.addEventListener("pointerup", () => {
+    clearTimeout(timer);
+    if (!longFired) insertAtCursor(defaultChar, defaultChar);
+  });
+  btn.addEventListener("pointerleave", () => clearTimeout(timer));
+}
+function showBracketPicker(anchorEl, options) {
+  document.querySelectorAll(".calc-bracket-popover").forEach(p => p.remove());
+  const rect = anchorEl.getBoundingClientRect();
+  const pop = document.createElement("div");
+  pop.className = "calc-bracket-popover";
+  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
+  pop.style.left = `${rect.left + window.scrollX}px`;
+  pop.innerHTML = options.map(ch => `<button type="button">${ch}</button>`).join("");
+  document.body.appendChild(pop);
+  pop.querySelectorAll("button").forEach((b, i) => {
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      insertAtCursor(options[i], options[i]);
+      pop.remove();
+    });
+  });
+  setTimeout(() => {
+    document.addEventListener("pointerdown", function closeOnOutside(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("pointerdown", closeOnOutside); }
+    });
+  }, 0);
+}
+setupBracketButton("calc-open-paren", "(", ["(", "[", "{"]);
+setupBracketButton("calc-close-paren", ")", [")", "]", "}"]);
+
+// ---------- Botones básicos ----------
 document.getElementById("calc-basic").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
-  if (btn.dataset.action === "clear") { tokens = []; editIndex = null; editPos = null; render(); return; }
-  if (btn.dataset.action === "back") {
-    if (editIndex !== null && editPos !== null) {
-      const t = tokens[editIndex];
-      const opChars = t.op.split("");
-      const labelChars = t.label.split("");
-      opChars.splice(editPos, 1);
-      labelChars.splice(editPos, 1);
-      if (opChars.length === 0) tokens.splice(editIndex, 1);
-      else { t.op = opChars.join(""); t.label = labelChars.join(""); }
-      editIndex = null; editPos = null;
-      render();
-      return;
-    }
-    const last = tokens[tokens.length - 1];
-    if (last && last.type === "num" && last.op.length > 1) {
-      last.op = last.op.slice(0, -1);
-      last.label = last.label.slice(0, -1);
-    } else {
-      tokens.pop();
-    }
-    render();
-    return;
-  }
+  if (btn.dataset.action === "clear") { cells = []; cursor = 0; render(); return; }
+  if (btn.dataset.action === "back") { backspaceAtCursor(); return; }
   if (btn.dataset.action === "equals") { evaluate(); return; }
   if (btn.dataset.action === "open-list") {
     renderFrequent();
     document.getElementById("calc-list-modal").style.display = "flex";
     return;
   }
-  if (btn.dataset.op) { pushToken(btn.dataset.op, btn.textContent); return; }
+  if (btn.dataset.op) { insertAtCursor(btn.dataset.op, btn.textContent); return; }
+});
+
+// ---------- Teclado físico (PC): fila de números Y numpad, flechas, etc ----------
+const KEY_OP = {
+  "+": ["+", "+"], "-": ["-", "−"], "*": ["*", "×"], "/": ["/", "÷"], "^": ["^", "^"],
+  "(": ["(", "("], ")": [")", ")"], "[": ["[", "["], "]": ["]", "]"], "{": ["{", "{"], "}": ["}", "}"],
+};
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return; // no interferir al escribir el nombre de "Guardar"
+  if (isDigitChar(e.key)) { e.preventDefault(); insertAtCursor(e.key, e.key); return; }
+  if (KEY_OP[e.key]) { e.preventDefault(); insertAtCursor(...KEY_OP[e.key]); return; }
+  if (e.key === "Enter" || e.key === "=") { e.preventDefault(); evaluate(); return; }
+  if (e.key === "Backspace") { e.preventDefault(); backspaceAtCursor(); return; }
+  if (e.key === "Delete") { e.preventDefault(); deleteForward(); return; }
+  if (e.key === "ArrowLeft") { e.preventDefault(); moveCursor(-1); return; }
+  if (e.key === "ArrowRight") { e.preventDefault(); moveCursor(1); return; }
+  if (e.key === "Escape") { e.preventDefault(); cells = []; cursor = 0; render(); return; }
 });
 
 // ---------- Operaciones frecuentes (guardadas en este dispositivo) ----------
@@ -333,16 +394,14 @@ function renderFrequent() {
   const wrap = document.getElementById("calc-frequent");
   wrap.innerHTML = list.length ? "" : '<span style="color:var(--text-muted);font-size:.82rem">Aún no guardas ninguna</span>';
   list.forEach((op, i) => {
-    if (!op.tokens && op.expr) op.tokens = [{ type: "op", op: op.expr, label: op.name }]; // formato viejo
+    if (!op.cells && op.tokens) op.cells = op.tokens; // compatibilidad con formato anterior
     const chip = document.createElement("div");
     chip.className = "calc-freq-chip";
     chip.innerHTML = `<span>${op.name}</span><button data-i="${i}" title="Eliminar">✕</button>`;
     chip.querySelector("span").addEventListener("click", () => {
-      // se insertan los tokens TAL CUAL se guardaron (cada número por su
-      // lado), para poder editar cualquiera de ellos después, no como un
-      // solo bloque fijo
-      op.tokens.forEach(t => tokens.push({ ...t }));
-      editIndex = null; editPos = null;
+      // se insertan las celdas TAL CUAL se guardaron, en la posición del
+      // cursor — cada número sigue siendo editable después
+      op.cells.forEach(c => { cells.splice(cursor, 0, { ...c }); cursor++; });
       render();
       document.getElementById("calc-list-modal").style.display = "none";
     });
@@ -356,10 +415,10 @@ function renderFrequent() {
 
 document.getElementById("calc-save-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  if (!tokens.length) return;
+  if (!cells.length) return;
   const nameEl = document.getElementById("calc-save-name");
   const list = getFrequent();
-  list.push({ name: nameEl.value.trim(), tokens: tokens.map(t => ({ ...t })) });
+  list.push({ name: nameEl.value.trim(), cells: cells.map(c => ({ ...c })) });
   saveFrequent(list);
   nameEl.value = "";
   document.getElementById("calc-save-modal").style.display = "none";

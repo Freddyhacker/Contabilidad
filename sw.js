@@ -12,7 +12,7 @@
    (con scripts desactualizados) si alguna vez una descarga
    falló a medias.
    ============================================ */
-const CACHE = "libro-v3";
+const CACHE = "libro-v4";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
@@ -24,54 +24,69 @@ self.addEventListener("activate", (e) => {
   self.clients.claim();
 });
 
+// Si la red tarda más de esto (señal débil/inestable), se deja de esperar
+// y se usa la copia en caché — para no quedarse pegado para siempre.
+function fetchWithTimeout(request, options, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("tiempo de espera agotado")), ms);
+    fetch(request, options).then(
+      (res) => { clearTimeout(timer); resolve(res); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
 
-  // sql.js (WASM) desde cdnjs: nunca cambia, cache-first
+  // sql.js (WASM) desde cdnjs: nunca cambia, cache-first. Si ya está en
+  // caché no toca la red para nada (rápido). Si es la primera vez (o se
+  // acaba de limpiar el caché del sitio) sí hay que esperar la descarga
+  // —no hay forma de evitarlo, la app la necesita para funcionar— pero
+  // con el mismo límite de tiempo: si la señal está mala y se cuelga, se
+  // reintenta en vez de quedarse esperando para siempre.
   if (url.hostname === "cdnjs.cloudflare.com") {
     e.respondWith(
       caches.open(CACHE).then(async (cache) => {
         const cached = await cache.match(e.request);
         if (cached) return cached;
-        const res = await fetch(e.request);
-        cache.put(e.request, res.clone());
-        return res;
+        try {
+          const res = await fetchWithTimeout(e.request, {}, 15000);
+          cache.put(e.request, res.clone());
+          return res;
+        } catch (err) {
+          return fetch(e.request); // último intento, sin límite de tiempo
+        }
       })
     );
     return;
   }
 
-  // Páginas HTML (navegación): SIEMPRE red si hay internet. Solo se usa
-  // la copia en caché cuando de verdad no hay conexión. cache:"reload"
-  // evita que el propio caché HTTP del navegador (una capa aparte de la
-  // de este service worker) devuelva una copia vieja sin siquiera pedirla
-  // a internet — que fue justo lo que causó que un CSS actualizado no se
-  // reflejara.
+  // Páginas HTML (navegación): red primero (para recibir actualizaciones),
+  // pero con límite de tiempo — si no responde rápido, usa la copia en
+  // caché en vez de dejar la pantalla pegada esperando.
   if (e.request.mode === "navigate") {
     e.respondWith(
-      fetch(e.request, { cache: "reload" })
+      fetchWithTimeout(e.request, { cache: "reload" }, 4000)
         .then((res) => {
           caches.open(CACHE).then((cache) => cache.put(e.request, res.clone()));
           return res;
         })
-        .catch(() => caches.match(e.request))
+        .catch(() => caches.match(e.request).then(c => c || fetch(e.request)))
     );
     return;
   }
 
-  // Otros archivos propios de la app (JS/CSS/íconos): red primero (para
-  // recibir actualizaciones), ignorando también el caché HTTP del
-  // navegador, con la copia en caché como respaldo instantáneo / modo
-  // sin conexión.
+  // Otros archivos propios de la app (JS/CSS/íconos): mismo criterio.
   if (url.origin === location.origin) {
     e.respondWith(
-      fetch(e.request, { cache: "reload" })
+      fetchWithTimeout(e.request, { cache: "reload" }, 4000)
         .then((res) => {
           caches.open(CACHE).then((cache) => cache.put(e.request, res.clone()));
           return res;
         })
-        .catch(() => caches.match(e.request))
+        .catch(() => caches.match(e.request).then(c => c || fetch(e.request)))
     );
   }
 });

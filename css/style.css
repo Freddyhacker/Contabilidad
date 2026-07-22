@@ -273,7 +273,8 @@ tr.date-sep td {
   vertical-align: middle; margin: 0 1px; animation: calc-blink 1s step-end infinite;
 }
 @keyframes calc-blink { 50% { opacity: 0; } }
-.calc-cell { cursor: pointer; border-radius: 3px; }
+.calc-cell { cursor: pointer; border-radius: 3px; padding: 0 3px; margin: 0 -1px; }
+.calc-cell:hover, .calc-cell:active { background: var(--bg-panel-alt); }
 
 .calc-modal {
   position: absolute; inset: 0; z-index: 60;
@@ -284,17 +285,6 @@ tr.date-sep td {
 .calc-modal-box {
   background: var(--bg-panel); border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius); padding: var(--space-4); width: 90%; max-width: 320px;
-}
-
-/* Ventanita flotante para elegir tipo de corchete al mantener presionado */
-.calc-bracket-popover {
-  position: absolute; z-index: 70; display: flex; gap: 6px;
-  background: var(--bg-panel); border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius); padding: 8px;
-}
-.calc-bracket-popover button {
-  width: 36px; height: 36px; border-radius: 6px; border: var(--border-width) solid var(--border-color);
-  background: var(--bg-panel-alt); color: var(--text-primary); font-size: 1.1rem; cursor: pointer;
 }
 
 .calc-freq-chip {

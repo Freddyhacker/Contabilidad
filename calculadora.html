@@ -172,7 +172,7 @@ function isDigitChar(ch) { return /^[0-9.]$/.test(ch); }
 // El eval usa siempre paréntesis reales; [ ] { } son solo visuales para
 // que el usuario distinga niveles de jerarquía a simple vista.
 function exprString() {
-  return cells.map(c => c.op).join("").replace(/[\[{]/g, "(").replace(/[\]}]/g, ")");
+  return cells.map(c => c.op).join("");
 }
 
 function insertAtCursor(op, label) {
@@ -218,6 +218,26 @@ function groupCells() {
   return groups;
 }
 
+// Detecta jerarquía de paréntesis automáticamente: el nivel 1 (el más
+// interno) se ve "(" ")", nivel 2 "[" "]", nivel 3 "{" "}", y si hay más
+// niveles se vuelve a repetir el ciclo. Para EVALUAR siempre son
+// paréntesis normales — esto es solo visual.
+const BRACKET_OPEN = ["(", "[", "{"];
+const BRACKET_CLOSE = [")", "]", "}"];
+function computeBracketLevels() {
+  const levels = new Array(cells.length).fill(null);
+  let depth = 0;
+  cells.forEach((c, i) => {
+    if (c.op === "(") { depth++; levels[i] = depth; }
+    else if (c.op === ")") { levels[i] = depth; depth = Math.max(0, depth - 1); }
+  });
+  return levels;
+}
+function bracketChar(op, level) {
+  const idx = ((level || 1) - 1) % 3;
+  return op === "(" ? BRACKET_OPEN[idx] : BRACKET_CLOSE[idx];
+}
+
 // Dibuja los dígitos de start a end (excluyente), insertando el cursor
 // parpadeante en cualquier hueco donde caiga (antes, en medio o después).
 function renderDigits(start, end) {
@@ -229,16 +249,19 @@ function renderDigits(start, end) {
   return html;
 }
 
-function renderAtom(g) {
+function renderAtom(g, levels) {
+  const cell = cells[g.start];
+  const label = (cell.op === "(" || cell.op === ")") ? bracketChar(cell.op, levels[g.start]) : cell.label;
   let html = "";
   if (cursor === g.start) html += `<span class="calc-cursor"></span>`;
-  html += `<span class="calc-cell" data-i="${g.start}">${cells[g.start].label}</span>`;
+  html += `<span class="calc-cell" data-i="${g.start}">${label}</span>`;
   return html;
 }
 
 function renderHTML() {
   if (!cells.length) return `0<span class="calc-cursor"></span>`;
   const groups = groupCells();
+  const levels = computeBracketLevels();
   let html = "";
   let gi = 0;
   while (gi < groups.length) {
@@ -252,7 +275,7 @@ function renderHTML() {
       gi += 3; continue;
     }
     if (g.type === "num") { html += renderDigits(g.start, g.end); gi++; continue; }
-    html += renderAtom(g);
+    html += renderAtom(g, levels);
     gi++;
   }
   if (cursor === cells.length) html += `<span class="calc-cursor"></span>`;
@@ -276,7 +299,12 @@ function evaluate() {
     const safe = exprString().replace(/\^/g, "**");
     const result = Function("sin", "cos", "tan", "log", "ln", "sqrt", "pi", `"use strict"; return (${safe})`)(sin, cos, tan, log, ln, sqrt, pi);
     if (typeof result !== "number" || !isFinite(result)) throw new Error("resultado inválido");
-    const rounded = Math.round(result * 1e10) / 1e10;
+    // Antes se recortaba siempre a 10 decimales. Un número de punto
+    // flotante (como usa JS y prácticamente cualquier calculadora) solo
+    // puede representar con exactitud unos 15-17 dígitos significativos
+    // en total — así que en vez de recortar de más, se conservan todos
+    // los que realmente son confiables.
+    const rounded = parseFloat(result.toPrecision(15));
     cells = String(rounded).split("").map(ch => ({ op: ch, label: ch, kind: isDigitChar(ch) ? "digit" : "atom" }));
     cursor = cells.length;
     render();
@@ -290,7 +318,6 @@ function evaluate() {
 document.getElementById("calc-sci").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
-  if (btn.dataset.op === "(" || btn.dataset.op === ")") return; // tienen su propio manejo (mantener presionado = corchetes)
   if (btn.dataset.op === "deg") {
     deg = !deg;
     btn.classList.toggle("active-toggle", deg);
@@ -311,45 +338,6 @@ document.getElementById("calc-sci").addEventListener("click", (e) => {
   if (btn.dataset.op) { insertAtCursor(btn.dataset.op, btn.textContent); return; }
 });
 
-// Paréntesis: toque corto = "(" o ")"; mantener presionado = elegir [ ] o { }
-function setupBracketButton(id, defaultChar, options) {
-  const btn = document.getElementById(id);
-  let timer = null, longFired = false;
-  btn.addEventListener("pointerdown", () => {
-    longFired = false;
-    timer = setTimeout(() => { longFired = true; showBracketPicker(btn, options); }, 450);
-  });
-  btn.addEventListener("pointerup", () => {
-    clearTimeout(timer);
-    if (!longFired) insertAtCursor(defaultChar, defaultChar);
-  });
-  btn.addEventListener("pointerleave", () => clearTimeout(timer));
-}
-function showBracketPicker(anchorEl, options) {
-  document.querySelectorAll(".calc-bracket-popover").forEach(p => p.remove());
-  const rect = anchorEl.getBoundingClientRect();
-  const pop = document.createElement("div");
-  pop.className = "calc-bracket-popover";
-  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  pop.style.left = `${rect.left + window.scrollX}px`;
-  pop.innerHTML = options.map(ch => `<button type="button">${ch}</button>`).join("");
-  document.body.appendChild(pop);
-  pop.querySelectorAll("button").forEach((b, i) => {
-    b.addEventListener("click", (e) => {
-      e.stopPropagation();
-      insertAtCursor(options[i], options[i]);
-      pop.remove();
-    });
-  });
-  setTimeout(() => {
-    document.addEventListener("pointerdown", function closeOnOutside(e) {
-      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("pointerdown", closeOnOutside); }
-    });
-  }, 0);
-}
-setupBracketButton("calc-open-paren", "(", ["(", "[", "{"]);
-setupBracketButton("calc-close-paren", ")", [")", "]", "}"]);
-
 // ---------- Botones básicos ----------
 document.getElementById("calc-basic").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
@@ -368,7 +356,7 @@ document.getElementById("calc-basic").addEventListener("click", (e) => {
 // ---------- Teclado físico (PC): fila de números Y numpad, flechas, etc ----------
 const KEY_OP = {
   "+": ["+", "+"], "-": ["-", "−"], "*": ["*", "×"], "/": ["/", "÷"], "^": ["^", "^"],
-  "(": ["(", "("], ")": [")", ")"], "[": ["[", "["], "]": ["]", "]"], "{": ["{", "{"], "}": ["}", "}"],
+  "(": ["(", "("], ")": [")", ")"],
 };
 window.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT") return; // no interferir al escribir el nombre de "Guardar"

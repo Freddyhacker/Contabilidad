@@ -370,15 +370,21 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { e.preventDefault(); cells = []; cursor = 0; render(); return; }
 });
 
-// ---------- Operaciones frecuentes (guardadas en este dispositivo) ----------
-const FREQ_KEY = "calc-frequent-ops";
-function getFrequent() {
-  try { return JSON.parse(localStorage.getItem(FREQ_KEY)) || []; } catch { return []; }
-}
-function saveFrequent(list) { localStorage.setItem(FREQ_KEY, JSON.stringify(list)); }
+// ---------- Operaciones frecuentes (sincronizadas: viven en tu usuario) ----------
+let currentUsername = null;
 
-function renderFrequent() {
-  const list = getFrequent();
+async function getFrequent() {
+  if (!currentUsername) return [];
+  const list = await Auth.getUserCalcFrequent(currentUsername);
+  return list || [];
+}
+async function saveFrequent(list) {
+  if (!currentUsername) return;
+  await Auth.saveUserCalcFrequent(currentUsername, list);
+}
+
+async function renderFrequent() {
+  const list = await getFrequent();
   const wrap = document.getElementById("calc-frequent");
   wrap.innerHTML = list.length ? "" : '<span style="color:var(--text-muted);font-size:.82rem">Aún no guardas ninguna</span>';
   list.forEach((op, i) => {
@@ -393,21 +399,21 @@ function renderFrequent() {
       render();
       document.getElementById("calc-list-modal").style.display = "none";
     });
-    chip.querySelector("button").addEventListener("click", (e) => {
+    chip.querySelector("button").addEventListener("click", async (e) => {
       e.stopPropagation();
-      const l = getFrequent(); l.splice(i, 1); saveFrequent(l); renderFrequent();
+      const l = await getFrequent(); l.splice(i, 1); await saveFrequent(l); renderFrequent();
     });
     wrap.appendChild(chip);
   });
 }
 
-document.getElementById("calc-save-form").addEventListener("submit", (e) => {
+document.getElementById("calc-save-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!cells.length) return;
   const nameEl = document.getElementById("calc-save-name");
-  const list = getFrequent();
+  const list = await getFrequent();
   list.push({ name: nameEl.value.trim(), cells: cells.map(c => ({ ...c })) });
-  saveFrequent(list);
+  await saveFrequent(list);
   nameEl.value = "";
   document.getElementById("calc-save-modal").style.display = "none";
 });
@@ -421,6 +427,7 @@ document.getElementById("calc-list-close").addEventListener("click", () => {
 (async () => {
   const session = await guardPage();
   if (!session) return;
+  currentUsername = session.username;
   render();
 })();
 </script>

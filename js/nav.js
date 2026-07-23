@@ -7,7 +7,7 @@
 // Súbele esto cada vez que se entregue una actualización — así se puede
 // confirmar de un vistazo (junto al LED) si un dispositivo ya cargó la
 // versión más reciente o sigue en una vieja por el caché.
-const APP_VERSION = "2026-07-23";
+const APP_VERSION = "2026-07-23b";
 
 // Si el navegador restaura esta página desde su caché de atrás/adelante
 // (bfcache), es una "foto" congelada de como quedó pintada — no vuelve a
@@ -61,6 +61,21 @@ async function guardPage() {
   if (typeof Sync !== "undefined") {
     Sync.checkRemoteChanges();
     Sync.startWatching();
+  }
+
+  // Tema y fórmulas de calculadora viven en el registro del usuario, no en
+  // los datos financieros — se refrescan aparte, también en segundo plano
+  // (sin bloquear), para que lo guardado en otro dispositivo aparezca sin
+  // tener que volver a iniciar sesión.
+  if (typeof Auth !== "undefined" && typeof Sheets !== "undefined" && Sheets.isConfigured()) {
+    Auth.pullUsersFromSheets().then(() => {
+      if (typeof Theme !== "undefined") {
+        Auth.getUserTheme(session.username).then(theme => {
+          if (theme && Object.keys(theme).length) Theme.apply(theme);
+        });
+      }
+      window.dispatchEvent(new CustomEvent("libro:users-synced"));
+    });
   }
 
   return session;

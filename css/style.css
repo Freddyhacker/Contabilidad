@@ -64,6 +64,8 @@ a { color: inherit; }
   );
   border-radius: 2px;
 }
+.led-version-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.app-version { font-size: .58rem; color: var(--text-muted); font-family: var(--font-mono); line-height: 1; white-space: nowrap; }
 
 .nav-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .nav-list a {

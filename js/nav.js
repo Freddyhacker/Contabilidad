@@ -4,6 +4,11 @@
    página (no se genera con JS) para que no haya parpadeo al cargar.
    ============================================ */
 
+// Súbele esto cada vez que se entregue una actualización — así se puede
+// confirmar de un vistazo (junto al LED) si un dispositivo ya cargó la
+// versión más reciente o sigue en una vieja por el caché.
+const APP_VERSION = "2026-07-23";
+
 // Si el navegador restaura esta página desde su caché de atrás/adelante
 // (bfcache), es una "foto" congelada de como quedó pintada — no vuelve a
 // correr guardPage(). Si mientras tanto cerraste sesión, verías la página
@@ -14,6 +19,7 @@ window.addEventListener("pageshow", (e) => {
 });
 
 function renderSidebar(session) {
+  document.querySelectorAll(".app-version").forEach(el => el.textContent = APP_VERSION);
   const initials = (session?.username || "?").slice(0, 2).toUpperCase();
   document.getElementById("user-avatar").textContent = initials;
   document.getElementById("user-name").textContent = session?.username || "";

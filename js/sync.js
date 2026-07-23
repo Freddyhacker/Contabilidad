@@ -159,7 +159,7 @@ const Sync = (() => {
     window.addEventListener("focus", checkRemoteChanges);
     setInterval(() => {
       if (document.visibilityState === "visible") checkRemoteChanges();
-    }, 15000);
+    }, 30000);
   }
 
   return { setLed, markDirty, updateLed, doSync, pullAll, checkRemoteChanges, startWatching };

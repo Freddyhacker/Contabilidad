@@ -34,17 +34,30 @@ const Sheets = (() => {
   async function call(body, opts = {}) {
     const { webAppUrl, secret } = getConfig();
     const payload = JSON.stringify({ ...body, secret });
+    // Límite de tiempo real: si Sheets/la red no responde en 12s, se
+    // aborta la petición en vez de dejarla colgada para siempre. Sin
+    // esto, una mala racha de red podía ir acumulando conexiones
+    // atoradas (el sondeo automático dispara peticiones nuevas cada
+    // 15s/al volver a la pestaña, sin cancelar las anteriores).
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
     let res;
     try {
-      // keepalive: la petición sigue viva aunque cambies de página o
-      // cierres la pestaña justo después de guardar
-      res = await fetch(webAppUrl, { method: "POST", body: payload, keepalive: !!opts.keepalive });
-    } catch (err) {
-      // keepalive tiene un límite de ~64KB por petición; si el libro ya
-      // creció mucho, se reintenta normal (ya no sobrevive a la navegación,
-      // pero al menos no falla)
-      if (opts.keepalive) res = await fetch(webAppUrl, { method: "POST", body: payload });
-      else throw err;
+      try {
+        res = await fetch(webAppUrl, { method: "POST", body: payload, keepalive: !!opts.keepalive, signal: controller.signal });
+      } catch (err) {
+        // keepalive tiene un límite de ~64KB por petición; si el libro ya
+        // creció mucho, se reintenta normal (ya no sobrevive a la
+        // navegación, pero al menos no falla) — salvo que el error sea
+        // por el propio timeout, ahí no tiene caso reintentar.
+        if (opts.keepalive && err.name !== "AbortError") {
+          res = await fetch(webAppUrl, { method: "POST", body: payload, signal: controller.signal });
+        } else {
+          throw err;
+        }
+      }
+    } finally {
+      clearTimeout(timer);
     }
     const data = await res.json();
     if (data.error) throw new Error(data.error);

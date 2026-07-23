@@ -429,6 +429,10 @@ document.getElementById("calc-list-close").addEventListener("click", () => {
   if (!session) return;
   currentUsername = session.username;
   render();
+
+  window.addEventListener("libro:users-synced", () => {
+    if (document.getElementById("calc-list-modal").style.display === "flex") renderFrequent();
+  });
 })();
 </script>
 </body>

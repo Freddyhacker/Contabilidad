@@ -14,8 +14,7 @@
 </head>
 <body>
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
-<div class="app-shell">
-  <main class="main" style="margin-left:0;max-width:100%">
+<div style="max-width:1100px;margin:0 auto;padding:var(--space-5)">
     <div class="topbar">
       <div>
         <h1>Calculadora</h1>
@@ -26,7 +25,9 @@
 
     <div class="card calc-card" style="position:relative">
       <div class="calc-wrap">
-      <div id="calc-display" class="figure" style="height:5.2rem;display:flex;align-items:flex-end;justify-content:flex-end;font-size:2.1rem;margin:6px 0 var(--space-3);white-space:nowrap;overflow-x:auto;overflow-y:hidden">0</div>
+      <div style="height:5.2rem;display:flex;align-items:flex-end;margin:6px 0 var(--space-3);overflow:hidden">
+        <div id="calc-display" class="figure" style="width:100%;text-align:right;font-size:2.1rem;white-space:nowrap;overflow-x:auto;overflow-y:hidden">0</div>
+      </div>
 
       <div class="calc-cols">
         <div class="calc-grid" id="calc-sci">
@@ -102,10 +103,7 @@
         </div>
       </div>
     </div>
-  </main>
-
-  </main>
-</div>
+  </div>
 <script>
 /* ============================================
    Modelo de datos: "cells" — cada carácter que se puede insertar o
@@ -193,10 +191,15 @@ function bracketChar(op, level) {
 }
 
 function renderDigits(start, end) {
+  // OJO: solo revisa el cursor ANTES de cada dígito (i < end), nunca
+  // después del último — esa posición la cubre quien venga después (el
+  // siguiente grupo, o el chequeo final de renderHTML). Si aquí también
+  // se revisara "después del último dígito", se dibujaría el cursor DOS
+  // veces cuando cae justo en ese límite.
   let html = "";
-  for (let i = start; i <= end; i++) {
+  for (let i = start; i < end; i++) {
     if (i === cursor) html += `<span class="calc-cursor"></span>`;
-    if (i < end) html += `<span class="calc-cell" data-i="${i}">${cells[i].label}</span>`;
+    html += `<span class="calc-cell" data-i="${i}">${cells[i].label}</span>`;
   }
   return html;
 }
@@ -219,11 +222,13 @@ function renderHTML() {
   while (gi < groups.length) {
     const g = groups[gi], g1 = groups[gi + 1], g2 = groups[gi + 2];
     if (g.type === "num" && g1 && g1.type === "atom" && cells[g1.start].op === "/" && g2 && g2.type === "num") {
-      html += `<span class="frac"><span class="num">${renderDigits(g.start, g.end)}</span><span class="den">${renderDigits(g2.start, g2.end)}</span></span>`;
+      const midCur = cursor === g.end ? `<span class="calc-cursor"></span>` : "";
+      html += `<span class="frac"><span class="num">${renderDigits(g.start, g.end)}${midCur}</span><span class="den">${renderDigits(g2.start, g2.end)}</span></span>`;
       gi += 3; continue;
     }
     if (g.type === "num" && g1 && g1.type === "atom" && cells[g1.start].op === "^" && g2 && g2.type === "num") {
-      html += `${renderDigits(g.start, g.end)}<sup>${renderDigits(g2.start, g2.end)}</sup>`;
+      const midCur = cursor === g.end ? `<span class="calc-cursor"></span>` : "";
+      html += `${renderDigits(g.start, g.end)}${midCur}<sup>${renderDigits(g2.start, g2.end)}</sup>`;
       gi += 3; continue;
     }
     if (g.type === "num") { html += renderDigits(g.start, g.end); gi++; continue; }

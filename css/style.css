@@ -234,8 +234,12 @@ tr.date-sep td {
 .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .74rem; background: var(--bg-panel-alt); color: var(--text-muted); }
 
 /* ---------- Calculadora ---------- */
-.calc-card { display: flex; justify-content: center; }
-.calc-wrap { width: 100%; max-width: 420px; }
+.calc-card { }
+.calc-wrap { width: 100%; max-width: 420px; margin: 0 auto; }
+#calc-display { scrollbar-width: thin; }
+#calc-display::-webkit-scrollbar { height: 4px; }
+#calc-display::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+#calc-display::-webkit-scrollbar-track { background: transparent; }
 .calc-cols { display: flex; flex-direction: column; }
 @media (min-width: 800px) {
   .calc-wrap { max-width: 760px; }

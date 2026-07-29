@@ -244,10 +244,15 @@ tr.date-sep td {
 @media (min-width: 800px) {
   .calc-wrap { max-width: 760px; }
   .calc-grid button { padding: 20px 6px; font-size: 1.1rem; }
-  #calc-display { font-size: 2.6rem; height: 6.2rem; }
+  .calc-display-frame { min-height: 7rem; }
+  #calc-display { font-size: 2.9rem; }
   .calc-cols { flex-direction: row; gap: 16px; align-items: flex-start; }
   .calc-cols > .calc-grid { flex: 1; margin-bottom: 0; }
 }
+/* El marco solo da una ALTURA MÍNIMA (no recorta) — una fracción es más
+   alta que una línea normal y nunca debe cortarse por arriba */
+.calc-display-frame { min-height: 5.2rem; display: flex; align-items: flex-end; margin: 6px 0 var(--space-3); }
+#calc-display { width: 100%; text-align: right; font-size: 2.1rem; white-space: nowrap; overflow-x: auto; overflow-y: hidden; }
 /* Los botones son parejos porque ninguno envuelve texto a 2 líneas */
 .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: var(--space-3); }
 .calc-grid button {

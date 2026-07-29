@@ -7,7 +7,7 @@
 // Súbele esto cada vez que se entregue una actualización — así se puede
 // confirmar de un vistazo (junto al LED) si un dispositivo ya cargó la
 // versión más reciente o sigue en una vieja por el caché.
-const APP_VERSION = "2026-07-24";
+const APP_VERSION = "2026-07-29";
 
 // Si el navegador restaura esta página desde su caché de atrás/adelante
 // (bfcache), es una "foto" congelada de como quedó pintada — no vuelve a

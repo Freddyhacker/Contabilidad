@@ -21,7 +21,7 @@
 
     <div class="tab-row" id="tab-row">
       <div class="tab-btn active" data-tab="login">Iniciar sesión</div>
-      <div class="tab-btn" data-tab="register">Crear cuenta</div>
+      <a href="calculadora-invitado.html" class="tab-btn" style="text-decoration:none;display:flex;align-items:center;justify-content:center">Solo calculadora</a>
     </div>
 
     <form id="login-form">
@@ -41,11 +41,11 @@
       <input id="r-user" required autocomplete="username">
       <label for="r-pass">Elige una contraseña</label>
       <input id="r-pass" type="password" required autocomplete="new-password">
-      <div class="error-msg" id="r-error">Este primer usuario será el administrador.</div>
-      <button class="btn btn-block" type="submit">Crear libro contable</button>
+      <div class="error-msg" id="r-error"></div>
+      <button class="btn btn-block" type="submit" id="r-submit">Crear libro contable</button>
     </form>
 
-    <a href="calculadora-invitado.html" class="btn btn-secondary btn-block" style="text-decoration:none;margin-top:var(--space-3)">Solo usar la calculadora</a>
+    <a href="#" id="toggle-register" class="btn btn-secondary btn-block" style="text-decoration:none;margin-top:var(--space-3)">Crear cuenta</a>
   </div>
 </div>
 
@@ -59,14 +59,41 @@
 <script src="js/sheets.js"></script>
 <script src="js/sync.js"></script>
 <script>
-document.querySelectorAll(".tab-btn").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
-    tab.classList.add("active");
-    const isLogin = tab.dataset.tab === "login";
-    document.getElementById("login-form").style.display = isLogin ? "block" : "none";
-    document.getElementById("register-form").style.display = isLogin ? "none" : "block";
-  });
+const loginForm = document.getElementById("login-form");
+const registerForm = document.getElementById("register-form");
+const loginTab = document.querySelector('.tab-btn[data-tab="login"]');
+const toggleLink = document.getElementById("toggle-register");
+const rError = document.getElementById("r-error");
+const rUser = document.getElementById("r-user");
+const rPass = document.getElementById("r-pass");
+const rSubmit = document.getElementById("r-submit");
+
+async function showRegister() {
+  loginForm.style.display = "none";
+  registerForm.style.display = "block";
+  loginTab.classList.remove("active");
+  toggleLink.textContent = "Ya tengo cuenta, iniciar sesión";
+  const hasUser = await Auth.hasAnyUser();
+  const blocked = hasUser; // ya existe un libro: no se puede autoregistrar
+  rError.textContent = blocked
+    ? "Ya existe un libro contable. Pide al administrador que te agregue como usuario desde Ajustes."
+    : "Este primer usuario será el administrador.";
+  rUser.disabled = blocked;
+  rPass.disabled = blocked;
+  rSubmit.disabled = blocked;
+  rSubmit.style.display = blocked ? "none" : "block";
+}
+function showLogin() {
+  registerForm.style.display = "none";
+  loginForm.style.display = "block";
+  loginTab.classList.add("active");
+  toggleLink.textContent = "Crear cuenta";
+}
+loginTab.addEventListener("click", showLogin);
+toggleLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (registerForm.style.display === "none") showRegister();
+  else showLogin();
 });
 
 // Si ya hay sesión guardada (recuérdame), entra directo

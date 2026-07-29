@@ -242,11 +242,11 @@ tr.date-sep td {
 #calc-display::-webkit-scrollbar-track { background: transparent; }
 .calc-cols { display: flex; flex-direction: column; }
 @media (min-width: 800px) {
-  .calc-wrap { max-width: 760px; }
-  .calc-grid button { padding: 20px 6px; font-size: 1.1rem; }
-  .calc-display-frame { min-height: 7rem; }
-  #calc-display { font-size: 2.9rem; }
-  .calc-cols { flex-direction: row; gap: 16px; align-items: flex-start; }
+  .calc-wrap { max-width: 960px; }
+  .calc-grid button { padding: 26px 8px; font-size: 1.3rem; }
+  .calc-display-frame { min-height: 8rem; }
+  #calc-display { font-size: 3.4rem; }
+  .calc-cols { flex-direction: row; gap: 24px; align-items: flex-start; }
   .calc-cols > .calc-grid { flex: 1; margin-bottom: 0; }
 }
 /* El marco solo da una ALTURA MÍNIMA (no recorta) — una fracción es más
